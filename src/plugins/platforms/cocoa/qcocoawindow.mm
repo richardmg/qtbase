@@ -39,6 +39,7 @@
 **
 ****************************************************************************/
 #include "qcocoawindow.h"
+#include "qcocoaintegration.h"
 #include "qnswindowdelegate.h"
 #include "qcocoaautoreleasepool.h"
 #include "qcocoaeventdispatcher.h"
@@ -183,8 +184,9 @@ static bool isMouseEvent(NSEvent *ev)
 
 @end
 
-QCocoaWindow::QCocoaWindow(QWindow *tlw)
+QCocoaWindow::QCocoaWindow(QWindow *tlw, const QCocoaIntegration *platformIntegration)
     : QPlatformWindow(tlw)
+    , m_platformIntegration(platformIntegration)
     , m_nsWindow(0)
     , m_synchedWindowState(Qt::WindowActive)
     , m_inConstructor(true)
@@ -773,6 +775,12 @@ QMargins QCocoaWindow::frameMargins() const
         (frameW.origin.y + frameW.size.height) - (frameC.origin.y + frameC.size.height),
         (frameW.origin.x + frameW.size.width) - (frameC.origin.x + frameC.size.width),
         frameC.origin.y - frameW.origin.y);
+}
+
+QPlatformScreen *QCocoaWindow::virtualScreen() const
+{
+    NSScreen *screen = [m_nsWindow screen];
+    return m_platformIntegration->qtForCocoaScreen(screen);
 }
 
 void QCocoaWindow::setFrameStrutEventsEnabled(bool enabled)

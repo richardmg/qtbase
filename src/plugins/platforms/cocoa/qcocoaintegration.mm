@@ -67,9 +67,14 @@ static void initResources()
 
 QT_BEGIN_NAMESPACE
 
+static const qreal defaltScreenDPI = 72.0;
+
 QCocoaScreen::QCocoaScreen(int screenIndex)
     :QPlatformScreen()
 {
+
+    qDebug() << "screen" << screenIndex;
+
     m_screen = [[NSScreen screens] objectAtIndex:screenIndex];
     NSRect frameRect = [m_screen frame];
     m_geometry = QRect(frameRect.origin.x, frameRect.origin.y, frameRect.size.width, frameRect.size.height);
@@ -82,12 +87,22 @@ QCocoaScreen::QCocoaScreen(int screenIndex)
 
     m_depth = NSBitsPerPixelFromDepth([m_screen depth]);
 
-    const int dpi = 72;
+
+    const qreal scale = qreal([m_screen backingScaleFactor]);
+    const qreal dpi = defaltScreenDPI * scale;
     const qreal inch = 25.4;
-    m_physicalSize = QSizeF(m_geometry.size()) * inch / dpi;
+
+    m_physicalSize = QSizeF(m_geometry.size()) * (inch / dpi);
+
+    qDebug() << "screen" << screenIndex << scale << m_geometry.size() << m_physicalSize;
 
     m_cursor = new QCocoaCursor;
 };
+
+QDpi QCocoaScreen::logicalDpi() const
+{
+    return QDpi(defaltScreenDPI, defaltScreenDPI);
+}
 
 QCocoaScreen::~QCocoaScreen()
 {
@@ -252,7 +267,7 @@ bool QCocoaIntegration::hasCapability(QPlatformIntegration::Capability cap) cons
 
 QPlatformWindow *QCocoaIntegration::createPlatformWindow(QWindow *window) const
 {
-    return new QCocoaWindow(window);
+    return new QCocoaWindow(window, this);
 }
 
 QPlatformOpenGLContext *QCocoaIntegration::createPlatformOpenGLContext(QOpenGLContext *context) const
@@ -325,6 +340,15 @@ QVariant QCocoaIntegration::styleHint(StyleHint hint) const
         return false;
 
     return QPlatformIntegration::styleHint(hint);
+}
+
+QPlatformScreen *QCocoaIntegration::qtForCocoaScreen(NSScreen *screen) const
+{
+    foreach (QCocoaScreen *platformScreen, mScreens) {
+        if (platformScreen->m_screen == screen)
+            return platformScreen;
+    }
+    return 0;
 }
 
 QT_END_NAMESPACE

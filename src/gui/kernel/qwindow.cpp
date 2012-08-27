@@ -1271,7 +1271,7 @@ QScreen *QWindow::screen() const
     Note that if the screen is part of a virtual desktop of multiple screens,
     the window can appear on any of the screens returned by QScreen::virtualSiblings().
 
-    \sa screen(), QScreen::virtualSiblings()
+    \sa screen(), QScreen::virtualSiblings(), virtualScreen()
 */
 void QWindow::setScreen(QScreen *newScreen)
 {
@@ -1292,6 +1292,21 @@ void QWindow::setScreen(QScreen *newScreen)
         }
         emit screenChanged(newScreen);
     }
+}
+
+/*!
+    Returns the screen on which the window is shown.
+
+    The value returned will change when the window is moved
+    between virtual screens (as returned by QScreen::virtualSiblings()).
+
+    \sa screen(), QScreen::virtualSiblings()
+*/
+QScreen *QWindow::virtualScreen() const
+{
+    Q_D(const QWindow);
+    //   QPlatformWindow->QPlatformScreen->QScreen
+    return d->platformWindow->virtualScreen()->screen();
 }
 
 void QWindow::screenDestroyed(QObject *object)

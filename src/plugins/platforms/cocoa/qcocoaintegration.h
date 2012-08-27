@@ -67,6 +67,7 @@ public:
     QRect availableGeometry() const { return m_availableGeometry; }
     int depth() const { return m_depth; }
     QImage::Format format() const { return m_format; }
+    QDpi logicalDpi() const;
     QSizeF physicalSize() const { return m_physicalSize; }
     QPlatformCursor *cursor() const  { return m_cursor; }
 
@@ -105,6 +106,7 @@ public:
     QPlatformServices *services() const;
     QVariant styleHint(StyleHint hint) const;
 
+    QPlatformScreen *qtForCocoaScreen(NSScreen *screen) const;
 private:
 
     QScopedPointer<QPlatformFontDatabase> mFontDb;

@@ -219,6 +219,7 @@ public:
 
     QScreen *screen() const;
     void setScreen(QScreen *screen);
+    QScreen *virtualScreen() const;
 
     virtual QAccessibleInterface *accessibleRoot() const;
     virtual QObject *focusObject() const;
