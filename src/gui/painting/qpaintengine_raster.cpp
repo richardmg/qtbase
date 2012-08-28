@@ -487,14 +487,26 @@ bool QRasterPaintEngine::begin(QPaintDevice *device)
 
     QRasterPaintEngineState *s = state();
     ensureOutlineMapper();
-    d->outlineMapper->m_clip_rect = d->deviceRect;
+
+    int scale = device->physicalDpiX() / device->logicalDpiX();
+
+
+    QRect scaledRect = QRect(QPoint(0,0), d->deviceRect.size() * scale);
+
+    QTransform transform;
+    transform.scale(scale, scale);
+    d->setSystemTransform(transform);
+    d->setSystemViewport(QRegion(scaledRect));
+    d->systemStateChanged();
+
+    d->outlineMapper->m_clip_rect = scaledRect;
 
     if (d->outlineMapper->m_clip_rect.width() > QT_RASTER_COORD_LIMIT)
         d->outlineMapper->m_clip_rect.setWidth(QT_RASTER_COORD_LIMIT);
     if (d->outlineMapper->m_clip_rect.height() > QT_RASTER_COORD_LIMIT)
         d->outlineMapper->m_clip_rect.setHeight(QT_RASTER_COORD_LIMIT);
 
-    d->rasterizer->setClipRect(d->deviceRect);
+    d->rasterizer->setClipRect(scaledRect);
 
     s->penData.init(d->rasterBuffer.data(), this);
     s->penData.setup(s->pen.brush(), s->intOpacity, s->composition_mode);

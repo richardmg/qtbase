@@ -84,7 +84,9 @@ void Window::initialize()
     create();
     m_backingStore = new QBackingStore(this);
 
-    m_image = QImage(geometry().size(), QImage::Format_RGB32);
+    QScreen *screen = this->virtualScreen();
+    qreal scaleFactor = screen->physicalDotsPerInch() / screen->logicalDotsPerInch();
+    m_image = QImage(geometry().size() * scaleFactor, QImage::Format_RGB32);
     m_image.fill(colorTable[m_backgroundColorIndex % (sizeof(colorTable) / sizeof(colorTable[0]))].rgba());
 
     m_lastPos = QPoint(-1, -1);
@@ -128,10 +130,15 @@ void Window::resizeEvent(QResizeEvent *)
 {
     QImage old = m_image;
 
-    //qDebug() << "Window::resizeEvent" << width << height;
+  //  qDebug() << "Window::resizeEvent" << geometry().size();
+    QScreen *screen = this->virtualScreen();
+    qreal scaleFactor = screen->physicalDotsPerInch() / screen->logicalDotsPerInch();
+    QSize backingSize = geometry().size() * scaleFactor;
 
-    int width = qMax(geometry().width(), old.width());
-    int height = qMax(geometry().height(), old.height());
+//    qDebug() << "backingSize" << backingSize;
+
+    int width = qMax(backingSize.width(), old.width());
+    int height = qMax(backingSize.height(), old.height());
 
     if (width > old.width() || height > old.height()) {
         m_image = QImage(width, height, QImage::Format_RGB32);
@@ -176,27 +183,38 @@ void Window::timerEvent(QTimerEvent *)
 
 void Window::render()
 {
-    QRect rect(QPoint(), geometry().size());
-
-    qDebug() << "render" << rect;
     QScreen *screen = this->virtualScreen();
-    qDebug() << "scale factor" << screen->logicalDotsPerInch() << screen->physicalDotsPerInch() << "screen" << screen << screen->size();
+    qreal scaleFactor = screen->physicalDotsPerInch() / screen->logicalDotsPerInch();
+    QRect windowRect(QPoint(), geometry().size() );
+    QRect backingRect(QPoint(), geometry().size() * scaleFactor);
 
-    m_backingStore->resize(rect.size());
-    m_backingStore->beginPaint(rect);
+//    qDebug() << "\nrender window size" << windowRect.size() << "backing size" << backingRect.size() << "image size" << m_image.size();
+
+    m_backingStore->resize(backingRect.size());
+    m_backingStore->beginPaint(backingRect);
     QPaintDevice *device = m_backingStore->paintDevice();
 
     QPainter p(device);
-    p.drawImage(0, 0, m_image);
+    p.drawImage(QRect(QPoint(0,0), backingRect.size()), // ### drawImage coordinate confusion
+                m_image,
+                QRect(QPoint(0,0), backingRect.size()));
+
+//    p.drawImage(QRect(QPoint(0,0), windowRect.size()), // ### drawImage coordinate confusion
+//                m_image,
+//                QRect(QPoint(0,0), backingRect.size()));
+
 
     QFont font;
-    font.setPixelSize(32);
+    // font.setPixelSize(32); // ### pixels should really mean pixels
+    font.setPointSize(32);
 
     p.setFont(font);
-    p.drawText(rect, 0, m_text);
+    p.drawText(backingRect, 0, m_text);
+
+    p.drawEllipse(100, 100, 150, 150);
 
     m_backingStore->endPaint();
-    m_backingStore->flush(rect);
+    m_backingStore->flush(backingRect);
 }
 
 

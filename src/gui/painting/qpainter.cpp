@@ -1828,16 +1828,33 @@ bool QPainter::begin(QPaintDevice *pd)
     }
 
     QRect systemRect = d->engine->systemRect();
+    int scale = pd->metric(QPaintDevice::PdmPhysicalDpiX) / pd->metric(QPaintDevice::PdmDpiX);
+
     if (!systemRect.isEmpty()) {
-        d->state->ww = d->state->vw = systemRect.width();
-        d->state->wh = d->state->vh = systemRect.height();
+
+        d->state->ww = systemRect.width();
+        d->state->vw = systemRect.width() * scale;
+        d->state->wh = systemRect.height();
+        d->state->vh = systemRect.height() * scale;
+/*        if (scale > 1) {
+            d->state->VxF = true;
+            d->updateMatrix();
+        }*/
     } else {
         d->state->ww = d->state->vw = pd->metric(QPaintDevice::PdmWidth);
         d->state->wh = d->state->vh = pd->metric(QPaintDevice::PdmHeight);
     }
+/*
+    qDebug() << "systemRect" << systemRect;
+    qDebug() << "window" << d->state->ww << d->state->wh;
+    qDebug() << "view" << d->state->vw << d->state->vh;
+    qDebug() << "metric: Pdm" << pd->metric(QPaintDevice::PdmWidth) << pd->metric(QPaintDevice::PdmHeight);
+    qDebug() << "metric: DPI" << pd->metric(QPaintDevice::PdmDpiX) << pd->metric(QPaintDevice::PdmPhysicalDpiX);
+*/
 
     const QPoint coordinateOffset = d->engine->coordinateOffset();
     d->state->redirectionMatrix.translate(-coordinateOffset.x(), -coordinateOffset.y());
+    d->state->redirectionMatrix.scale(scale, scale);
 
     Q_ASSERT(d->engine->isActive());
 
@@ -2769,9 +2786,13 @@ void QPainter::setClipRect(const QRectF &rect, Qt::ClipOperation op)
     Enables clipping, and sets the clip region to the given \a rectangle using the given
     clip \a operation.
 */
-void QPainter::setClipRect(const QRect &rect, Qt::ClipOperation op)
+void QPainter::setClipRect(const QRect &inRect, Qt::ClipOperation op)
 {
     Q_D(QPainter);
+
+    QRect rect = QRect(inRect.topLeft(), inRect.size() * (d->device->physicalDpiX() / d->device->logicalDpiX()));
+
+    qDebug() << "setClipRect" << rect;
 
     if (!d->engine) {
         qWarning("QPainter::setClipRect: Painter not active");
@@ -2831,6 +2852,10 @@ void QPainter::setClipRegion(const QRegion &r, Qt::ClipOperation op)
         printf("QPainter::setClipRegion(), size=%d, [%d,%d,%d,%d]\n",
            r.rects().size(), rect.x(), rect.y(), rect.width(), rect.height());
 #endif
+
+    qDebug() << "setClipRegion" << r.boundingRect();
+    // ### TODO scale region?
+
     if (!d->engine) {
         qWarning("QPainter::setClipRegion: Painter not active");
         return;

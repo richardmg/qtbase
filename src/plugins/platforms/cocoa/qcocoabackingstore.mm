@@ -50,7 +50,14 @@ QT_BEGIN_NAMESPACE
 QCocoaBackingStore::QCocoaBackingStore(QWindow *window)
     : QPlatformBackingStore(window)
 {
-    m_image = new QImage(window->geometry().size(),QImage::Format_ARGB32_Premultiplied);
+    int scaleFactor = 1;
+    QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window->handle());
+    if (cocoaWindow && cocoaWindow->m_contentView) {
+        scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
+    }
+
+    m_image = new QImage(window->geometry().size() * scaleFactor, QImage::Format_ARGB32_Premultiplied);
+    m_image->setDPIScale(scaleFactor);
 }
 
 QCocoaBackingStore::~QCocoaBackingStore()
@@ -88,10 +95,18 @@ void QCocoaBackingStore::flush(QWindow *widget, const QRegion &region, const QPo
 
 void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
 {
-    delete m_image;
-    m_image = new QImage(size, QImage::Format_ARGB32_Premultiplied);
-
+    int scaleFactor = 1;
     QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window()->handle());
+    if (cocoaWindow && cocoaWindow->m_contentView) {
+        scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
+    }
+
+    delete m_image;
+    m_image = new QImage(size *scaleFactor, QImage::Format_ARGB32_Premultiplied);
+    m_image->setDPIScale(scaleFactor);
+
+//    qDebug() << "resize image to" << m_image->size() << "dpm" << m_image->dotsPerMeterX();
+
     if (cocoaWindow)
         [static_cast<QNSView *>(cocoaWindow->m_contentView) setImage:m_image];
 }

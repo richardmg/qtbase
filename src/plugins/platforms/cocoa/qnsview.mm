@@ -228,23 +228,32 @@ static QTouchDevice *touchDevice = 0;
     if (!m_cgImage)
         return;
 
-    CGRect dirtyCGRect = NSRectToCGRect(dirtyRect);
+    NSRect backingRect;
+    if (NSWindow *window = [self window])
+        backingRect = [window convertRectToBacking : dirtyRect];
+    else
+        backingRect = dirtyRect;
+
+    CGRect dirtyCGBackingRect = NSRectToCGRect(backingRect);
+    CGRect dirtyCGWindowRect = NSRectToCGRect(dirtyRect);
+
+    //qDebug() << "drawRect window"  << dirtyRect.origin.x << dirtyRect.origin.y << dirtyRect.size.width << dirtyRect.size.height;
+    //qDebug() << "drawRect backing"  << backingRect.origin.x << backingRect.origin.y << backingRect.size.width << backingRect.size.height;
 
     NSGraphicsContext *nsGraphicsContext = [NSGraphicsContext currentContext];
     CGContextRef cgContext = (CGContextRef) [nsGraphicsContext graphicsPort];
 
     CGContextSaveGState( cgContext );
-    int dy = dirtyCGRect.origin.y + CGRectGetMaxY(dirtyCGRect);
+    int dy = dirtyCGWindowRect.origin.y + CGRectGetMaxY(dirtyCGWindowRect);
     CGContextTranslateCTM(cgContext, 0, dy);
     CGContextScaleCTM(cgContext, 1, -1);
 
-    CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGRect);
-    CGContextDrawImage(cgContext,dirtyCGRect,subImage);
+    CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGBackingRect);
+    CGContextDrawImage(cgContext, dirtyCGWindowRect, subImage);
 
     CGContextRestoreGState(cgContext);
 
     CGImageRelease(subImage);
-
 }
 
 - (BOOL) isFlipped

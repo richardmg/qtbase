@@ -95,12 +95,15 @@ static QImage rotated270(const QImage &src);
 QBasicAtomicInt qimage_serial_number = Q_BASIC_ATOMIC_INITIALIZER(1);
 
 QImageData::QImageData()
-    : ref(0), width(0), height(0), depth(0), nbytes(0), data(0),
+    : ref(0), width(0), height(0), depth(0), nbytes(0), scale(1.0), data(0),
       format(QImage::Format_ARGB32), bytes_per_line(0),
       ser_no(qimage_serial_number.fetchAndAddRelaxed(1)),
       detach_no(0),
+      ldpmx(qt_defaultDpiX() * 100 / qreal(2.54)),
+      ldpmy(qt_defaultDpiY() * 100 / qreal(2.54)),
       dpmx(qt_defaultDpiX() * 100 / qreal(2.54)),
       dpmy(qt_defaultDpiY() * 100 / qreal(2.54)),
+
       offset(0, 0), own_data(true), ro_data(false), has_alpha_clut(false),
       is_cached(false), is_locked(false), cleanupFunction(0), cleanupInfo(0),
       paintEngine(0)
@@ -1356,6 +1359,11 @@ void QImage::setColorTable(const QVector<QRgb> colors)
             break;
         }
     }
+}
+
+void QImage::setDPIScale(qreal scale)
+{
+    d->scale = scale;
 }
 
 /*!
@@ -4949,19 +4957,19 @@ int QImage::metric(PaintDeviceMetric metric) const
         break;
 
     case PdmDpiX:
-        return qRound(d->dpmx * 0.0254);
+        return qRound(d->ldpmx * 0.0254);
         break;
 
     case PdmDpiY:
-        return qRound(d->dpmy * 0.0254);
+        return qRound(d->ldpmy * 0.0254);
         break;
 
     case PdmPhysicalDpiX:
-        return qRound(d->dpmx * 0.0254);
+        return qRound(d->dpmx * 0.0254 * d->scale);
         break;
 
     case PdmPhysicalDpiY:
-        return qRound(d->dpmy * 0.0254);
+        return qRound(d->dpmy * 0.0254 * d->scale);
         break;
 
     default:
