@@ -44,6 +44,7 @@
 
 #include <QtGui/qscreen.h>
 #include <qpa/qplatformscreen.h>
+#include "qemulatedhidpi_p.h"
 
 #include <QtCore/private/qobject_p.h>
 
@@ -61,8 +62,10 @@ public:
         , orientationUpdateMask(0)
     {
         orientation = screen->orientation();
-        geometry = screen->geometry();
-        availableGeometry = screen->availableGeometry();
+
+        geometry = qhidpiPixelToPoint(screen->geometry());
+        availableGeometry = qhidpiPixelToPoint(screen->availableGeometry());
+
         logicalDpi = screen->logicalDpi();
         refreshRate = screen->refreshRate();
 

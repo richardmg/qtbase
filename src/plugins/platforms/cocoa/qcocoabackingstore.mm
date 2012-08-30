@@ -44,6 +44,7 @@
 
 #include <QtCore/qdebug.h>
 #include <QtGui/QPainter>
+#include <QtGui/private/qemulatedhidpi_p.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -76,7 +77,11 @@ void QCocoaBackingStore::flush(QWindow *widget, const QRegion &region, const QPo
     Q_UNUSED(offset);
     QCocoaAutoReleasePool pool;
 
-    QRect geo = region.boundingRect();
+    //qDebug() << "flush points" << region.boundingRect();
+    //qDebug() << "flush points" << qhidpiPointToPixel(region.boundingRect());
+
+    QRect geo = qhidpiPointToPixel(region.boundingRect());
+    //QRect geo = region.boundingRect();
     NSRect rect = NSMakeRect(geo.x(), geo.y(), geo.width(), geo.height());
     QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window()->handle());
     if (cocoaWindow) {

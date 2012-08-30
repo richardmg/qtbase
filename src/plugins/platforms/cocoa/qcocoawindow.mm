@@ -48,6 +48,7 @@
 #include "qnsview.h"
 #include <QtCore/qfileinfo.h>
 #include <QtCore/private/qcore_mac_p.h>
+#include <QtGui/private/qemulatedhidpi_p.h>
 #include <qwindow.h>
 #include <qpa/qwindowsysteminterface.h>
 #include <qpa/qplatformscreen.h>
@@ -256,7 +257,7 @@ void QCocoaWindow::setVisible(bool visible)
 
             // The parent window might have moved while this window was hidden,
             // update the window geometry if there is a parent.
-            setGeometry(window()->geometry());
+            setGeometry(qhidpiPointToPixel(window()->geometry()));
 
             // Register popup windows so that the parent window can
             // close them when needed.
@@ -451,31 +452,31 @@ void QCocoaWindow::propagateSizeHints()
 
 #ifdef QT_COCOA_ENABLE_WINDOW_DEBUG
     qDebug() << "QCocoaWindow::propagateSizeHints" << this;
-    qDebug() << "     min/max " << window()->minimumSize() << window()->maximumSize();
-    qDebug() << "size increment" << window()->sizeIncrement();
-    qDebug() << "     basesize" << window()->baseSize();
-    qDebug() << "     geometry" << geometry();
+    qDebug() << "     min/max " << qhidpiPointToPixel(qhwindow()->minimumSize()) << qhidpiPointToPixel(window()->maximumSize());
+    qDebug() << "size increment" << qhidpiPointToPixel(window()->sizeIncrement());
+    qDebug() << "     basesize" << qhidpiPointToPixel(window()->baseSize());
+    qDebug() << "     geometry" << qhidpiPointToPixel(geometry());
 #endif
 
     // Set the minimum content size.
-    const QSize minimumSize = window()->minimumSize();
+    const QSize minimumSize = qhidpiPointToPixel(window()->minimumSize());
     if (!minimumSize.isValid()) // minimumSize is (-1, -1) when not set. Make that (0, 0) for Cocoa.
         [m_nsWindow setContentMinSize : NSMakeSize(0.0, 0.0)];
     [m_nsWindow setContentMinSize : NSMakeSize(minimumSize.width(), minimumSize.height())];
 
     // Set the maximum content size.
-    const QSize maximumSize = window()->maximumSize();
+    const QSize maximumSize = qhidpiPointToPixel(window()->maximumSize());
     [m_nsWindow setContentMaxSize : NSMakeSize(maximumSize.width(), maximumSize.height())];
 
     // sizeIncrement is observed to take values of (-1, -1) and (0, 0) for windows that should be
     // resizable and that have no specific size increment set. Cocoa expects (1.0, 1.0) in this case.
     if (!window()->sizeIncrement().isEmpty())
-        [m_nsWindow setResizeIncrements : qt_mac_toNSSize(window()->sizeIncrement())];
+        [m_nsWindow setResizeIncrements : qt_mac_toNSSize(qhidpiPointToPixel(window()->sizeIncrement()))];
     else
         [m_nsWindow setResizeIncrements : NSMakeSize(1.0, 1.0)];
 
     QRect rect = geometry();
-    QSize baseSize = window()->baseSize();
+    QSize baseSize = qhidpiPointToPixel(window()->baseSize());
     if (!baseSize.isNull() && baseSize.isValid()) {
         [m_nsWindow setFrame:NSMakeRect(rect.x(), rect.y(), baseSize.width(), baseSize.height()) display:YES];
     }
@@ -599,6 +600,8 @@ void QCocoaWindow::recreateWindow(const QPlatformWindow *parentWindow)
         setWindowState(window()->windowState());
     } else {
         // Child windows have no NSWindow, link the NSViews instead.
+        qDebug() << "create child window" << this << "parent" << parentWindow;
+
         const QCocoaWindow *parentCococaWindow = static_cast<const QCocoaWindow *>(parentWindow);
         [parentCococaWindow->m_contentView addSubview : m_contentView];
     }
@@ -607,8 +610,7 @@ void QCocoaWindow::recreateWindow(const QPlatformWindow *parentWindow)
 NSWindow * QCocoaWindow::createNSWindow()
 {
     QCocoaAutoReleasePool pool;
-
-    NSRect frame = qt_mac_flipRect(window()->geometry(), window());
+    NSRect frame = qt_mac_flipRect(qhidpiPointToPixel(window()->geometry()), window());
 
     Qt::WindowType type = window()->windowType();
     Qt::WindowFlags flags = window()->windowFlags();

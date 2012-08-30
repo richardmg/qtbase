@@ -54,7 +54,8 @@
 #include <qpa/qwindowsysteminterface.h>
 #include <QtGui/QTextFormat>
 #include <QtCore/QDebug>
-#include <private/qguiapplication_p.h>
+#include <QtGui/private/qguiapplication_p.h>
+#include <QtGui/private/qemulatedhidpi_p.h>
 
 #ifdef QT_COCOA_ENABLE_ACCESSIBILITY_INSPECTOR
 #include <accessibilityinspector.h>
@@ -255,6 +256,41 @@ static QTouchDevice *touchDevice = 0;
 
     CGImageRelease(subImage);
 }
+/*
+  Emulated HiDPI
+
+
+- (void) drawRect:(NSRect)dirtyRect
+{
+    if (!m_cgImage)
+        return;
+
+    // dirtyRect is in pixels
+    QRect qDirtyPixelRect(dirtyRect.origin.x, dirtyRect.origin.y, dirtyRect.size.width, dirtyRect.size.height);
+    QRect qDirtyPointRect = qhidpiPixelToPoint(qDirtyPixelRect);
+    CGRect dirtyCGPixelRect = CGRectMake(qDirtyPixelRect.x(), qDirtyPixelRect.y(), qDirtyPixelRect.width(), qDirtyPixelRect.height());
+    CGRect dirtyCGPointRect = CGRectMake(qDirtyPointRect.x(), qDirtyPointRect.y(), qDirtyPointRect.width(), qDirtyPointRect.height());
+
+    //qDebug() <<"";
+    //qDebug() << "drawRect pixels " << qDirtyPixelRect;
+    //qDebug() << "drawRect points" << qDirtyPointRect;
+
+    NSGraphicsContext *nsGraphicsContext = [NSGraphicsContext currentContext];
+    CGContextRef cgContext = (CGContextRef) [nsGraphicsContext graphicsPort];
+
+    CGContextSaveGState( cgContext );
+    int dy = dirtyCGPixelRect.origin.y + CGRectGetMaxY(dirtyCGPixelRect);
+    CGContextTranslateCTM(cgContext, 0, dy);
+    CGContextScaleCTM(cgContext, 1, -1);
+
+    CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGPointRect);
+    CGContextDrawImage(cgContext, dirtyCGPixelRect, subImage);
+
+    CGContextRestoreGState(cgContext);
+
+    CGImageRelease(subImage);
+}
+*/
 
 - (BOOL) isFlipped
 {
