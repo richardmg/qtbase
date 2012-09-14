@@ -1,11 +1,16 @@
 #include "qemulatedhidpi_p.h"
 
-bool qt_use_emulated_hidpi_mode = true;
+bool qt_use_emulated_hidpi_mode = false;
 const qreal qt_emulated_scale_factor = 2.0;
 
 void qhidpiSetEmulationEnabled(bool enable)
 {
     qt_use_emulated_hidpi_mode = enable;
+}
+
+bool qhidpiIsEmulationEnabled()
+{
+    return qt_use_emulated_hidpi_mode;
 }
 
 QRect qhidpiPixelToPoint(const QRect &pixelRect)
