@@ -249,7 +249,7 @@ static QTouchDevice *touchDevice = 0;
         CGContextTranslateCTM(cgContext, 0, dy);
         CGContextScaleCTM(cgContext, 1, -1);
 
-        CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGPointRect);
+        CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGPixelRect);
         CGContextDrawImage(cgContext, dirtyCGPixelRect, subImage);
 
         CGContextRestoreGState(cgContext);
