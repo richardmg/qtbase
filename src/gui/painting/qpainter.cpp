@@ -225,6 +225,19 @@ QTransform QPainterPrivate::viewTransform() const
     return QTransform();
 }
 
+QTransform QPainterPrivate::hidpiScaleTransform() const
+{
+    qreal deviceScale = device->physicalDpiX() / device->logicalDpiX();
+
+    // ### should be baked into device scale
+    extern qreal qhidpiIsEmulationGetScaleFactor();
+    deviceScale *= qhidpiIsEmulationGetScaleFactor();
+
+    if (deviceScale > 1) {
+        return QTransform::fromScale(deviceScale, deviceScale);
+    }
+    return QTransform();
+}
 
 /*
    \internal
@@ -630,7 +643,14 @@ void QPainterPrivate::drawStretchedGradient(const QPainterPath &path, DrawOperat
 
 void QPainterPrivate::updateMatrix()
 {
-    state->matrix = state->WxF ? state->worldMatrix : QTransform();
+    extern qreal qhidpiIsEmulationEnabled();
+    if (qhidpiIsEmulationEnabled) {
+        state->matrix = state->worldMatrix;
+        state->matrix *= hidpiScaleTransform();
+    } else {
+        state->matrix = state->WxF ? state->worldMatrix : QTransform();
+    }
+
     if (state->VxF)
         state->matrix *= viewTransform();
 
@@ -1828,7 +1848,7 @@ bool QPainter::begin(QPaintDevice *pd)
     }
 
     QRect systemRect = d->engine->systemRect();
-    int scale = pd->metric(QPaintDevice::PdmPhysicalDpiX) / pd->metric(QPaintDevice::PdmDpiX);
+    //int scale = pd->metric(QPaintDevice::PdmPhysicalDpiX) / pd->metric(QPaintDevice::PdmDpiX);
 
     if (!systemRect.isEmpty()) {
         d->state->ww = d->state->vw = systemRect.width();
@@ -1850,7 +1870,8 @@ bool QPainter::begin(QPaintDevice *pd)
 
     Q_ASSERT(d->engine->isActive());
 
-    if (!d->state->redirectionMatrix.isIdentity())
+    extern qreal qhidpiIsEmulationEnabled();
+    if (!d->state->redirectionMatrix.isIdentity() || qhidpiIsEmulationEnabled)
         d->updateMatrix();
 
     Q_ASSERT(d->engine->isActive());
@@ -8272,7 +8293,7 @@ QTransform QPainter::combinedTransform() const
         qWarning("QPainter::combinedTransform: Painter not active");
         return QTransform();
     }
-    return d->state->worldMatrix * d->viewTransform();
+    return d->state->worldMatrix * d->viewTransform() * d->hidpiScaleTransform();
 }
 
 /*!
