@@ -1363,6 +1363,8 @@ void QImage::setColorTable(const QVector<QRgb> colors)
 
 void QImage::setDPIScale(qreal scale)
 {
+    if (!d)
+        return;
     d->scale = scale;
 }
 
