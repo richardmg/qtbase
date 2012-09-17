@@ -227,10 +227,12 @@ QTransform QPainterPrivate::viewTransform() const
 
 QTransform QPainterPrivate::hidpiScaleTransform() const
 {
+    extern qreal qhidpiIsEmulationGetScaleFactor();
+
     qreal deviceScale = device->physicalDpiX() / device->logicalDpiX();
 
     // ### should be baked into device scale
-    extern qreal qhidpiIsEmulationGetScaleFactor();
+
     deviceScale *= qhidpiIsEmulationGetScaleFactor();
 
     if (deviceScale > 1) {
@@ -643,13 +645,9 @@ void QPainterPrivate::drawStretchedGradient(const QPainterPath &path, DrawOperat
 
 void QPainterPrivate::updateMatrix()
 {
-    extern qreal qhidpiIsEmulationEnabled();
-    if (qhidpiIsEmulationEnabled) {
-        state->matrix = state->worldMatrix;
-        state->matrix *= hidpiScaleTransform();
-    } else {
-        state->matrix = state->WxF ? state->worldMatrix : QTransform();
-    }
+    state->matrix = state->worldMatrix;
+
+    state->matrix *= hidpiScaleTransform();
 
     if (state->VxF)
         state->matrix *= viewTransform();
@@ -1870,8 +1868,8 @@ bool QPainter::begin(QPaintDevice *pd)
 
     Q_ASSERT(d->engine->isActive());
 
-    extern qreal qhidpiIsEmulationEnabled();
-    if (!d->state->redirectionMatrix.isIdentity() || qhidpiIsEmulationEnabled)
+    bool ishidpi = true; // ###
+    if (!d->state->redirectionMatrix.isIdentity() || ishidpi)
         d->updateMatrix();
 
     Q_ASSERT(d->engine->isActive());
