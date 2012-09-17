@@ -185,19 +185,30 @@ void Window::render()
 {
     QScreen *screen = this->virtualScreen();
     qreal scaleFactor = screen->physicalDotsPerInch() / screen->logicalDotsPerInch();
-    QRect windowRect(QPoint(), geometry().size() );
-    QRect backingRect(QPoint(), geometry().size() * scaleFactor);
 
-//    qDebug() << "\nrender window size" << windowRect.size() << "backing size" << backingRect.size() << "image size" << m_image.size();
+    QRect windowRect(QPoint(), geometry().size());
+    QRect slightltSmallerWindowRect(QPoint(), geometry().size() * 0.9);
+    QRect backingRect(QPoint(), geometry().size() * 2); // ###
 
-    m_backingStore->resize(backingRect.size());
-    m_backingStore->beginPaint(backingRect);
+
+    qDebug() << "\nrender window size" << windowRect.size() << "backing size" << backingRect.size() << "image size" << m_image.size();
+    qDebug() << "screen physical" << screen->physicalDotsPerInch() << "screen logical" << screen->logicalDotsPerInch() << "scale" << scaleFactor;
+
+
+
+
+    m_backingStore->resize(windowRect.size());
+    m_backingStore->beginPaint(windowRect);
     QPaintDevice *device = m_backingStore->paintDevice();
 
     QPainter p(device);
-    p.drawImage(QRect(QPoint(0,0), backingRect.size()), // ### drawImage coordinate confusion
-                m_image,
-                QRect(QPoint(0,0), backingRect.size()));
+    p.fillRect(backingRect, Qt::red);
+    p.fillRect(windowRect, Qt::blue);
+    p.fillRect(slightltSmallerWindowRect, Qt::gray);
+
+  //  p.drawImage(QRect(QPoint(0,0), backingRect.size()), // ### drawImage coordinate confusion
+  //              m_image,
+  //              QRect(QPoint(0,0), backingRect.size()));
 
 //    p.drawImage(QRect(QPoint(0,0), windowRect.size()), // ### drawImage coordinate confusion
 //                m_image,
@@ -209,12 +220,12 @@ void Window::render()
     font.setPointSize(32);
 
     p.setFont(font);
-    p.drawText(backingRect, 0, m_text);
+    p.drawText(windowRect, 0, m_text);
 
     p.drawEllipse(100, 100, 150, 150);
 
     m_backingStore->endPaint();
-    m_backingStore->flush(backingRect);
+    m_backingStore->flush(windowRect);
 }
 
 
