@@ -13,6 +13,14 @@ bool qhidpiIsEmulationEnabled()
     return qt_use_emulated_hidpi_mode;
 }
 
+qreal qhidpiIsEmulationGetScaleFactor()
+{
+    if (!qt_use_emulated_hidpi_mode)
+        return 1.0f;
+
+    return qt_emulated_scale_factor;
+}
+
 QRect qhidpiPixelToPoint(const QRect &pixelRect)
 {
     if (!qt_use_emulated_hidpi_mode)

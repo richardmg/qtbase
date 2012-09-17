@@ -19,6 +19,8 @@
 //
 void qhidpiSetEmulationEnabled(bool enable);
 Q_GUI_EXPORT bool qhidpiIsEmulationEnabled();
+Q_GUI_EXPORT qreal qhidpiIsEmulationGetScaleFactor();
+
 
 // ### don't want to export 20 new symbols, but
 // the platform plugins needs access.
