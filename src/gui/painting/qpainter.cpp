@@ -230,10 +230,8 @@ QTransform QPainterPrivate::hidpiScaleTransform() const
     extern qreal qhidpiIsEmulationGetScaleFactor();
 
     qreal deviceScale = device->physicalDpiX() / device->logicalDpiX();
+//    qDebug() << "scales" << deviceScale << qhidpiIsEmulationGetScaleFactor();
 
-    // ### should be baked into device scale
-
-    deviceScale *= qhidpiIsEmulationGetScaleFactor();
 
     if (deviceScale > 1) {
         return QTransform::fromScale(deviceScale, deviceScale);
@@ -647,7 +645,8 @@ void QPainterPrivate::updateMatrix()
 {
     state->matrix = state->worldMatrix;
 
-//    state->matrix *= hidpiScaleTransform();
+    state->matrix *= hidpiScaleTransform();
+    engine->d_func()->setSystemTransform(hidpiScaleTransform()); // scale systemClip
 
     if (state->VxF)
         state->matrix *= viewTransform();
@@ -1868,7 +1867,7 @@ bool QPainter::begin(QPaintDevice *pd)
 
     Q_ASSERT(d->engine->isActive());
 
-    bool ishidpi = false; // ###
+    bool ishidpi = true; // ###
     if (!d->state->redirectionMatrix.isIdentity() || ishidpi)
         d->updateMatrix();
 
@@ -8291,7 +8290,7 @@ QTransform QPainter::combinedTransform() const
         qWarning("QPainter::combinedTransform: Painter not active");
         return QTransform();
     }
-    return d->state->worldMatrix * d->viewTransform()/* * d->hidpiScaleTransform()*/;
+    return d->state->worldMatrix * d->viewTransform() * d->hidpiScaleTransform();
 }
 
 /*!
