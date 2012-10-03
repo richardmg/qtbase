@@ -221,7 +221,7 @@ void QXcbWindow::create()
     // Parameters to XCreateWindow() are frame corner + inner size.
     // This fits in case position policy is frame inclusive. There is
     // currently no way to implement it for frame-exclusive geometries.
-    QRect rect = qhdpiPointToPixlel(window()->geometry());
+    QRect rect = qhidpiPointToPixel(window()->geometry());
     QPlatformWindow::setGeometry(rect);
 
     rect.setWidth(qBound(1, rect.width(), XCOORD_MAX));

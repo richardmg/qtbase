@@ -142,10 +142,22 @@ QMargins qhidpiPointToPixel(const QMargins &pointMargins)
 
 QRegion qhidpiPixelToPoint(const QRegion &pixelRegion)
 {
-    return pixelRegion; // ### figure it out
+    if (!qhidpiIsEmulationEnabled())
+        return pixelRegion;
+
+    QRegion pointRegion;
+    foreach(const QRect &rect, pixelRegion.rects())
+        pointRegion += qhidpiPixelToPoint(rect);
+    return pixelRegion;
 }
 
 QRegion qhidpiPointToPixel(const QRegion &pointRegion)
 {
-    return pointRegion; // ### figure it out
+    if (!qhidpiIsEmulationEnabled())
+        return pointRegion;
+
+    QRegion pixelRegon;
+    foreach(const QRect &rect, pointRegion.rects())
+        pixelRegon += qhidpiPointToPixel(rect);
+    return pixelRegon; // ### figure it out
 }

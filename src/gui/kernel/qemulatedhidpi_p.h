@@ -1,18 +1,22 @@
 
 #include <QtGui>
 
-// Emulate HiDPI by creating an artificial point coordinate system
+// Emulate 2x high-dpi by creating an artificial point coordinate system
 // half the size of the real "pixel" coordinate system. The goal is
-// to make HiDPI work on platforms that lack explicit support for
+// to make 2x high-dpi work on platforms that lack explicit support for
 // this feature.
 //
-// The scaling is applied on the QPA level. (QWindow, QScreen, QWindowSystemInterface)
-// The most QPlatform* classes and subclasses operate in pixels
-// and do not know about the scaling. QWidgets and QtQuick items
-// are *mostly* in point space. Exceptions:
+// High-dpi emulation is enabled by setting the QT_EMULATED_HIGHDPI
+// environment variable.
 //
-// QPixmaps, QImges, and OpenGL are in pixel space.
+// The scaling is applied at the QPA level (QWindow, QScreen, QWindowSystemInterface).
+// The QPlatform* classes and subclasses mostly operate in pixels
+// and do not know about the scaling. QWidgets and QtQuick items
+// are mostly in point space. Exceptions:
+//
+// QPixmaps, QImges, and OpenGL are in pixels
 // The backing store is in pixel space.
+//
 //
 // The functions are pass-through functions if hidpi emulation is
 // disabled. (see qemulatedhidpi.cpp).
@@ -23,7 +27,7 @@ Q_GUI_EXPORT qreal qhidpiIsEmulationGetScaleFactor();
 
 
 // ### don't want to export 20 new symbols, but
-// the platform plugins needs access.
+// the platform plugins need access.
 Q_GUI_EXPORT QRect qhidpiPixelToPoint(const QRect &pixelRect);
 Q_GUI_EXPORT QRect qhidpiPointToPixel(const QRect &pointRect);
 Q_GUI_EXPORT QRectF qhidpiPixelToPoint(const QRectF &pixelRect);
