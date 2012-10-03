@@ -645,9 +645,6 @@ void QPainterPrivate::updateMatrix()
 {
     state->matrix = state->worldMatrix;
 
-    state->matrix *= hidpiScaleTransform();
-    engine->d_func()->setSystemTransform(hidpiScaleTransform()); // scale systemClip
-
     if (state->VxF)
         state->matrix *= viewTransform();
 
@@ -657,6 +654,9 @@ void QPainterPrivate::updateMatrix()
         extended->transformChanged();
     else
         state->dirtyFlags |= QPaintEngine::DirtyTransform;
+
+    state->matrix *= hidpiScaleTransform();
+    engine->d_func()->setSystemTransform(hidpiScaleTransform()); // scale systemClip
 
 //     printf("VxF=%d, WxF=%d\n", state->VxF, state->WxF);
 //     qDebug() << " --- using matrix" << state->matrix << redirection_offset;
