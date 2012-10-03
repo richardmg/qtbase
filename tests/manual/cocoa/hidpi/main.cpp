@@ -41,16 +41,44 @@
 
 #include <QtCore>
 #include <QtGui>
+#include <QtWidgets>
 
 #include "window.h"
+
+class PainterWidget : public QWidget
+{
+public:
+    void paintEvent(QPaintEvent *event)
+    {
+        QRect rect(QPoint(0,0), size() / 2);
+        QPainter p(this);
+        //p.setClipping(false);
+        //p.translate(50, 50);
+        qDebug() << "";
+        qDebug() << "PainterWidget::fillRect" << rect;
+        p.fillRect(rect, QBrush(Qt::blue));
+    }
+};
+
+
 
 int main(int argc, char *argv[])
 {
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 
-    Window window;
-    window.show();
+    //Window window;
+    //window.show();
+
+    QWidget parent;
+    parent.resize(300, 300);
+    parent.show();
+
+    PainterWidget painterWidget;
+    painterWidget.setParent(&parent);
+    painterWidget.move(100,100);
+    painterWidget.resize(250, 250);
+    painterWidget.show();
 
     return app.exec();
 }

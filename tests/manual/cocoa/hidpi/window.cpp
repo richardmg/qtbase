@@ -73,10 +73,10 @@ void Window::initialize()
     if (parent())
         setGeometry(QRect(160, 120, 320, 240));
     else {
-        setGeometry(QRect(10, 10, 640, 480));
+        setGeometry(QRect(10, 10, 320, 200));
 
         setSizeIncrement(QSize(10, 10));
-        setBaseSize(QSize(640, 480));
+//        setBaseSize(QSize(640, 480));
         setMinimumSize(QSize(240, 160));
         setMaximumSize(QSize(800, 600));
     }
@@ -194,12 +194,11 @@ void Window::render()
     qDebug() << "\nrender window size" << windowRect.size() << "backing size" << backingRect.size() << "image size" << m_image.size();
     qDebug() << "screen physical" << screen->physicalDotsPerInch() << "screen logical" << screen->logicalDotsPerInch() << "scale" << scaleFactor;
 
-
-
-
     m_backingStore->resize(windowRect.size());
     m_backingStore->beginPaint(windowRect);
     QPaintDevice *device = m_backingStore->paintDevice();
+    qDebug() << "qpaintdevice size" << device->width() << device->height();
+
 
     QPainter p(device);
     p.fillRect(backingRect, Qt::red);
@@ -222,7 +221,7 @@ void Window::render()
     p.setFont(font);
     p.drawText(windowRect, 0, m_text);
 
-    p.drawEllipse(100, 100, 150, 150);
+    p.drawEllipse(10, 10, 150, 150);
 
     m_backingStore->endPaint();
     m_backingStore->flush(windowRect);
