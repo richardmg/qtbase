@@ -57,6 +57,8 @@ QCocoaBackingStore::QCocoaBackingStore(QWindow *window)
         scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
     }
 
+    scaleFactor *= qhidpiIsEmulationGetScaleFactor();
+
     m_image = new QImage(window->geometry().size() * scaleFactor, QImage::Format_ARGB32_Premultiplied);
     m_image->setDPIScale(scaleFactor);
 }
@@ -105,6 +107,8 @@ void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
     if (cocoaWindow && cocoaWindow->m_contentView) {
         scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
     }
+
+    scaleFactor *= qhidpiIsEmulationGetScaleFactor();
 
     delete m_image;
     m_image = new QImage(size *scaleFactor, QImage::Format_ARGB32_Premultiplied);
