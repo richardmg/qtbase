@@ -647,7 +647,7 @@ void QPainterPrivate::updateMatrix()
 {
     state->matrix = state->worldMatrix;
 
-    state->matrix *= hidpiScaleTransform();
+//    state->matrix *= hidpiScaleTransform();
 
     if (state->VxF)
         state->matrix *= viewTransform();
@@ -1868,7 +1868,7 @@ bool QPainter::begin(QPaintDevice *pd)
 
     Q_ASSERT(d->engine->isActive());
 
-    bool ishidpi = true; // ###
+    bool ishidpi = false; // ###
     if (!d->state->redirectionMatrix.isIdentity() || ishidpi)
         d->updateMatrix();
 
@@ -8291,7 +8291,7 @@ QTransform QPainter::combinedTransform() const
         qWarning("QPainter::combinedTransform: Painter not active");
         return QTransform();
     }
-    return d->state->worldMatrix * d->viewTransform() * d->hidpiScaleTransform();
+    return d->state->worldMatrix * d->viewTransform()/* * d->hidpiScaleTransform()*/;
 }
 
 /*!
