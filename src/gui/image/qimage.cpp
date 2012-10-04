@@ -95,7 +95,7 @@ static QImage rotated270(const QImage &src);
 QBasicAtomicInt qimage_serial_number = Q_BASIC_ATOMIC_INITIALIZER(1);
 
 QImageData::QImageData()
-    : ref(0), width(0), height(0), depth(0), nbytes(0), scale(1.0), data(0),
+    : ref(0), width(0), height(0), depth(0), nbytes(0), dpiScaleFactor(1.0), data(0),
       format(QImage::Format_ARGB32), bytes_per_line(0),
       ser_no(qimage_serial_number.fetchAndAddRelaxed(1)),
       detach_no(0),
@@ -1219,6 +1219,7 @@ QImage QImage::copy(const QRect& r) const
 
     image.d->dpmx = dotsPerMeterX();
     image.d->dpmy = dotsPerMeterY();
+    image.d->dpiScaleFactor = dpiScaleFactor();
     image.d->offset = offset();
     image.d->has_alpha_clut = d->has_alpha_clut;
     image.d->text = d->text;
@@ -1361,13 +1362,6 @@ void QImage::setColorTable(const QVector<QRgb> colors)
     }
 }
 
-void QImage::setDPIScale(qreal scale)
-{
-    if (!d)
-        return;
-    d->scale = scale;
-}
-
 /*!
     Returns a list of the colors contained in the image's color table,
     or an empty list if the image does not have a color table
@@ -1377,6 +1371,50 @@ void QImage::setDPIScale(qreal scale)
 QVector<QRgb> QImage::colorTable() const
 {
     return d ? d->colortable : QVector<QRgb>();
+}
+
+/*!
+    Returns the current dpi scale factor for the image.
+
+    Common values for the scale factor is 1.0 (the default),
+    and 2.0 for images intended for display on High DPI displays.
+
+    Use this function when calculating layouts based on the
+    image size. Layout size is pixel size divided by the scale
+    factor.
+
+    \sa setScaleFactor()
+*/
+qreal QImage::dpiScaleFactor() const
+{
+    if (!d)
+        return 1.0;
+    return d->dpiScaleFactor;
+}
+
+/*!
+    Sets the dpi scale factor for the image.
+
+    The scale factor is typically set to 2.0 when producing
+    images for high-dpi displays. This informs layout code
+    paths in Qt which use the image size that the image is
+    a high-resolution image, and not a large image.
+
+    Qt supports using the "@2x" suffix when loading
+    images from files. Loading "myicon@2x.png" will result
+    in an image with a 2x scale factor.
+
+    Setting the scale factor will also change the dpi information
+    returned by QPaindevice::metric(): Physical dpi will logical dpi
+    multiplied by the scale factor.
+
+    \sa scaleFactor()
+*/
+void QImage::setDpiScaleFactor(qreal scaleFactor)
+{
+    if (!d)
+        return;
+    d->dpiScaleFactor = scaleFactor;
 }
 
 /*!
@@ -3369,6 +3407,7 @@ QImage QImage::convertToFormat(Format format, Qt::ImageConversionFlags flags) co
 
         image.setDotsPerMeterY(dotsPerMeterY());
         image.setDotsPerMeterX(dotsPerMeterX());
+        image.setDpiScaleFactor(dpiScaleFactor());
 
         image.d->text = d->text;
 
@@ -3489,6 +3528,7 @@ QImage QImage::convertToFormat(Format format, const QVector<QRgb> &colorTable, Q
 
     QImage image(d->width, d->height, format);
     QIMAGE_SANITYCHECK_MEMORY(image);
+    image.setDpiScaleFactor(dpiScaleFactor());
 
     image.d->text = d->text;
 
@@ -4967,11 +5007,11 @@ int QImage::metric(PaintDeviceMetric metric) const
         break;
 
     case PdmPhysicalDpiX:
-        return qRound(d->dpmx * 0.0254 * d->scale);
+        return qRound(d->dpmx * 0.0254 * d->dpiScaleFactor);
         break;
 
     case PdmPhysicalDpiY:
-        return qRound(d->dpmy * 0.0254 * d->scale);
+        return qRound(d->dpmy * 0.0254 * d->dpiScaleFactor);
         break;
 
     default:
@@ -5672,6 +5712,7 @@ QImage QImage::transformed(const QTransform &matrix, Qt::TransformationMode mode
 
     dImage.d->dpmx = dotsPerMeterX();
     dImage.d->dpmy = dotsPerMeterY();
+    dImage.d->dpiScaleFactor = dpiScaleFactor();
 
     switch (bpp) {
         // initizialize the data

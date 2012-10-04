@@ -60,7 +60,7 @@ QCocoaBackingStore::QCocoaBackingStore(QWindow *window)
     scaleFactor *= qhidpiIsEmulationGetScaleFactor();
 
     m_image = new QImage(window->geometry().size() * scaleFactor, QImage::Format_ARGB32_Premultiplied);
-    m_image->setDPIScale(scaleFactor);
+    m_image->setDpiScaleFactor(scaleFactor);
 }
 
 QCocoaBackingStore::~QCocoaBackingStore()
@@ -112,7 +112,7 @@ void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
 
     delete m_image;
     m_image = new QImage(size *scaleFactor, QImage::Format_ARGB32_Premultiplied);
-    m_image->setDPIScale(scaleFactor);
+    m_image->setDpiScaleFactor(scaleFactor);
 
 //    qDebug() << "resize image to" << m_image->size() << "dpm" << m_image->dotsPerMeterX();
 

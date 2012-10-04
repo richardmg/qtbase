@@ -339,7 +339,7 @@ void QXcbBackingStore::resize(const QSize &size, const QRegion &)
     delete m_image;
     int scaleFactor = qhidpiIsEmulationGetScaleFactor();
     m_image = new QXcbShmImage(screen, size * scaleFactor, win->depth(), win->imageFormat());
-    m_image->image()->setDPIScale(scaleFactor);
+    m_image->image()->setDpiScaleFactor(scaleFactor);
     Q_XCB_NOOP(connection());
 
     m_syncingResize = true;
