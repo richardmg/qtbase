@@ -5398,6 +5398,7 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
 
     int w = image.width();
     int h = image.height();
+    qreal scale = image.dpiScaleFactor();
 
     d->updateState(d->state);
 
@@ -5421,8 +5422,7 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
         setBrush(brush);
         setPen(Qt::NoPen);
         setBrushOrigin(QPointF(0, 0));
-
-        drawRect(image.rect());
+        drawRect(QRect(QPoint(0, 0), image.size() / scale));
         restore();
         return;
     }
@@ -5433,7 +5433,6 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
         y += d->state->matrix.dy();
     }
 
-    qreal scale = image.dpiScaleFactor();
     d->engine->drawImage(QRectF(x, y, w / scale, h / scale), image, QRectF(0, 0, w, h), Qt::AutoColor);
 }
 

@@ -2134,9 +2134,10 @@ void QRasterPaintEngine::drawImage(const QPointF &p, const QImage &img)
 
     Q_D(QRasterPaintEngine);
     QRasterPaintEngineState *s = state();
+    qreal scale = img.dpiScaleFactor();
 
-    if (s->matrix.type() > QTransform::TxTranslate) {
-        drawImage(QRectF(p.x(), p.y(), img.width(), img.height()),
+    if (scale > 1.0 ||  s->matrix.type() > QTransform::TxTranslate) {
+        drawImage(QRectF(p.x(), p.y(), img.width() / scale, img.height() / scale),
                   img,
                   QRectF(0, 0, img.width(), img.height()));
     } else {
