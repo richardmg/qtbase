@@ -352,6 +352,7 @@ void QRasterPlatformPixmap::createPixmapForImage(QImage &sourceImage, Qt::ImageC
     }
     is_null = (w <= 0 || h <= 0);
 
+    image.d->dpiScaleFactor = sourceImage.dpiScaleFactor();
     setSerialNumber(image.cacheKey() >> 32);
 }
 
