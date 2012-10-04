@@ -1414,6 +1414,7 @@ void QImage::setDpiScaleFactor(qreal scaleFactor)
 {
     if (!d)
         return;
+    detach();
     d->dpiScaleFactor = scaleFactor;
 }
 
