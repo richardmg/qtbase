@@ -239,9 +239,14 @@ QPixmapIconEngineEntry *QPixmapIconEngine::bestMatch(const QSize &size, QIcon::M
     return pe;
 }
 
-QPixmap QPixmapIconEngine::pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state)
+QPixmap QPixmapIconEngine::pixmap(const QSize &inSize, QIcon::Mode mode, QIcon::State state)
 {
     QPixmap pm;
+    QSize size = inSize;
+    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
+    if (enableHighdpi)
+        size *= qApp->dpiScaleFactor(); // Don't know which screen at this point.
+
     QPixmapIconEngineEntry *pe = bestMatch(size, mode, state, false);
     if (pe)
         pm = pe->pixmap;
@@ -295,11 +300,19 @@ QPixmap QPixmapIconEngine::pixmap(const QSize &size, QIcon::Mode mode, QIcon::St
         }
         QPixmapCache::insert(key % HexString<uint>(mode), pm);
     }
+    if (enableHighdpi && pm.size().width() > inSize.width()) // detect high-dpi pixmap
+        pm.setDpiScaleFactor(qMax(qreal(1.0), qreal(pm.size().width()) / qreal(inSize.width())));
+
     return pm;
 }
 
-QSize QPixmapIconEngine::actualSize(const QSize &size, QIcon::Mode mode, QIcon::State state)
+QSize QPixmapIconEngine::actualSize(const QSize &inSize, QIcon::Mode mode, QIcon::State state)
 {
+    QSize size = inSize;
+    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
+    if (enableHighdpi)
+        size *= qApp->dpiScaleFactor(); // Don't know which screen at this point.
+
     QSize actualSize;
     if (QPixmapIconEngineEntry *pe = bestMatch(size, mode, state, true))
         actualSize = pe->size;

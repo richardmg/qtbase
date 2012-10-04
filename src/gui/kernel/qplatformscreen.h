@@ -98,6 +98,7 @@ public:
 
     virtual QSizeF physicalSize() const;
     virtual QDpi logicalDpi() const;
+    virtual qreal dpiScaleFactor() const;
 
     virtual qreal refreshRate() const;
 

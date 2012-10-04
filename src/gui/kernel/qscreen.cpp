@@ -214,6 +214,12 @@ qreal QScreen::logicalDotsPerInch() const
     return (dpi.first + dpi.second) * qreal(0.5);
 }
 
+qreal QScreen::dpiScaleFactor() const
+{
+    Q_D(const QScreen);
+    return d->platformScreen->dpiScaleFactor() * qhidpiIsEmulationGetScaleFactor();
+}
+
 /*!
   \property QScreen::physicalSize
   \brief the screen's physical size (in millimeters)

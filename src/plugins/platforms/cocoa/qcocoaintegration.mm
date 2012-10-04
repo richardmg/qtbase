@@ -104,6 +104,11 @@ QDpi QCocoaScreen::logicalDpi() const
     return QDpi(defaltScreenDPI, defaltScreenDPI);
 }
 
+qreal QCocoaScreen::dpiScaleFactor() const
+{
+    return qreal([m_screen backingScaleFactor]);
+}
+
 QCocoaScreen::~QCocoaScreen()
 {
     delete m_cursor;

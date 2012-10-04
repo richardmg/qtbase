@@ -109,6 +109,8 @@ public:
     qreal logicalDotsPerInchY() const;
     qreal logicalDotsPerInch() const;
 
+    qreal dpiScaleFactor() const;
+
     QSize availableSize() const;
     QRect availableGeometry() const;
 
