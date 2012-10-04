@@ -272,12 +272,14 @@ int QRasterPlatformPixmap::metric(QPaintDevice::PaintDeviceMetric metric) const
         return d->colortable.size();
     case QPaintDevice::PdmDepth:
         return this->d;
-    case QPaintDevice::PdmDpiX: // fall-through
-    case QPaintDevice::PdmPhysicalDpiX:
+    case QPaintDevice::PdmDpiX:
         return qt_defaultDpiX();
-    case QPaintDevice::PdmDpiY: // fall-through
+    case QPaintDevice::PdmPhysicalDpiX:
+        return qt_defaultDpiX() * image.dpiScaleFactor();
+    case QPaintDevice::PdmDpiY:
+        return qt_defaultDpiX();
     case QPaintDevice::PdmPhysicalDpiY:
-        return qt_defaultDpiY();
+        return qt_defaultDpiY() * image.dpiScaleFactor();
     default:
         qWarning("QRasterPlatformPixmap::metric(): Unhandled metric type %d", metric);
         break;
@@ -356,6 +358,16 @@ void QRasterPlatformPixmap::createPixmapForImage(QImage &sourceImage, Qt::ImageC
 QImage* QRasterPlatformPixmap::buffer()
 {
     return &image;
+}
+
+qreal QRasterPlatformPixmap::dpiScaleFactor() const
+{
+    return image.dpiScaleFactor();
+}
+
+void QRasterPlatformPixmap::setDpiScaleFactor(qreal scaleFactor)
+{
+    image.setDpiScaleFactor(scaleFactor);
 }
 
 QT_END_NAMESPACE

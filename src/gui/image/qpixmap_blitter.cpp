@@ -195,6 +195,16 @@ void QBlittablePlatformPixmap::fromImage(const QImage &image,
     }
 }
 
+qreal QBlittablePlatformPixmap::dpiScaleFactor() const
+{
+    return m_dpiScaleFactor;
+}
+
+void QBlittablePlatformPixmap::setDpiScaleFactor(qreal scaleFactor)
+{
+    m_dpiScaleFactor = scaleFactor;
+}
+
 QPaintEngine *QBlittablePlatformPixmap::paintEngine() const
 {
     if (!m_engine) {

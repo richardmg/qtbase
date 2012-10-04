@@ -102,6 +102,9 @@ public:
     QBitmap mask() const;
     void setMask(const QBitmap &);
 
+    qreal dpiScaleFactor() const;
+    void setDpiScaleFactor(qreal scaleFactor);
+
     bool hasAlpha() const;
     bool hasAlphaChannel() const;
 

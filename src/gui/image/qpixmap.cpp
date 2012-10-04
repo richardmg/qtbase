@@ -638,6 +638,49 @@ void QPixmap::setMask(const QBitmap &mask)
     data->fromImage(image, Qt::AutoColor);
 }
 
+/*!
+    Returns the current dpi scale factor for the pixmap.
+
+    Common values for the scale factor is 1.0 (the default),
+    and 2.0 for images intended for display on High DPI displays.
+
+    Use this function when calculating layouts based on the
+    pixmap size. Layout size is pixel size divided by the scale
+    factor.
+
+    \sa setScaleFactor(), QIcon::pixmap()
+*/
+qreal QPixmap::dpiScaleFactor() const
+{
+    if (!data)
+        return qreal(1.0);
+    return data->dpiScaleFactor();
+}
+
+/*!
+    Sets the dpi scale factor for the pixmap.
+
+    The scale factor is typically set to 2.0 when producing
+    pixmap for high-dpi displays. This informs layout code
+    paths in Qt which use the image size that the image is
+    a high-resolution image, and not a large image.
+
+    Qt supports using the "@2x" suffix when loading
+    pixmap from files. Loading "myicon@2x.png" will result
+    in an image with a 2x scale factor.
+
+    Setting the scale factor will also change the dpi information
+    returned by QPainDevice::metric(): Physical dpi is logical dpi
+    multiplied by the scale factor.
+
+    \sa scaleFactor()
+*/
+void QPixmap::setDpiScaleFactor(qreal scaleFactor)
+{
+    detach();
+    data->setDpiScaleFactor(scaleFactor);
+}
+
 #ifndef QT_NO_IMAGE_HEURISTIC_MASK
 /*!
     Creates and returns a heuristic mask for this pixmap.
