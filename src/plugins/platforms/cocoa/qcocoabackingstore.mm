@@ -57,10 +57,7 @@ QCocoaBackingStore::QCocoaBackingStore(QWindow *window)
         scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
     }
 
-    scaleFactor *= qhidpiIsEmulationGetScaleFactor();
-
     m_image = new QImage(window->geometry().size() * scaleFactor, QImage::Format_ARGB32_Premultiplied);
-    m_image->setDpiScaleFactor(scaleFactor);
 }
 
 QCocoaBackingStore::~QCocoaBackingStore()
@@ -79,11 +76,9 @@ void QCocoaBackingStore::flush(QWindow *widget, const QRegion &region, const QPo
     Q_UNUSED(offset);
     QCocoaAutoReleasePool pool;
 
-    //qDebug() << "flush points" << region.boundingRect();
-    //qDebug() << "flush points" << qhidpiPointToPixel(region.boundingRect());
+    //qDebug() << "flush pixels" << region.boundingRect();
 
-    QRect geo = qhidpiPointToPixel(region.boundingRect());
-    //QRect geo = region.boundingRect();
+    QRect geo = region.boundingRect();
     NSRect rect = NSMakeRect(geo.x(), geo.y(), geo.width(), geo.height());
     QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window()->handle());
     if (cocoaWindow) {
@@ -107,8 +102,6 @@ void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
     if (cocoaWindow && cocoaWindow->m_contentView) {
         scaleFactor = int([[cocoaWindow->m_contentView window] backingScaleFactor]);
     }
-
-    scaleFactor *= qhidpiIsEmulationGetScaleFactor();
 
     delete m_image;
     m_image = new QImage(size *scaleFactor, QImage::Format_ARGB32_Premultiplied);

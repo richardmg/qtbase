@@ -294,7 +294,7 @@ void QXcbBackingStore::flush(QWindow *window, const QRegion &region, const QPoin
 
     QSize imageSize = m_image->size();
 
-    QRegion clipped = qhidpiPointToPixel(region);
+    QRegion clipped = region;
     clipped &= qhidpiPointToPixel(QRect(0, 0, window->width(), window->height()));
     clipped &= QRect(0, 0, imageSize.width(), imageSize.height()).translated(-offset);
 
@@ -337,9 +337,7 @@ void QXcbBackingStore::resize(const QSize &size, const QRegion &)
     QXcbWindow* win = static_cast<QXcbWindow *>(pw);
 
     delete m_image;
-    int scaleFactor = qhidpiIsEmulationGetScaleFactor();
-    m_image = new QXcbShmImage(screen, size * scaleFactor, win->depth(), win->imageFormat());
-    m_image->image()->setDpiScaleFactor(scaleFactor);
+    m_image = new QXcbShmImage(screen, size, win->depth(), win->imageFormat());
     Q_XCB_NOOP(connection());
 
     m_syncingResize = true;

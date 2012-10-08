@@ -72,9 +72,6 @@ static const qreal defaltScreenDPI = 72.0;
 QCocoaScreen::QCocoaScreen(int screenIndex)
     :QPlatformScreen()
 {
-
-    qDebug() << "screen" << screenIndex;
-
     m_screen = [[NSScreen screens] objectAtIndex:screenIndex];
     NSRect frameRect = [m_screen frame];
     m_geometry = QRect(frameRect.origin.x, frameRect.origin.y, frameRect.size.width, frameRect.size.height);
@@ -93,9 +90,6 @@ QCocoaScreen::QCocoaScreen(int screenIndex)
     const qreal inch = 25.4;
 
     m_physicalSize = QSizeF(m_geometry.size()) * (inch / dpi);
-
-    qDebug() << "screen" << screenIndex << scale << m_geometry.size() << m_physicalSize;
-
     m_cursor = new QCocoaCursor;
 };
 
