@@ -768,6 +768,13 @@ QCocoaMenuBar *QCocoaWindow::menubar() const
     return m_menubar;
 }
 
+qreal QCocoaWindow::dpiScaleFactor() const
+{
+    if (!m_nsWindow)
+        return 1.0;
+    return qreal([m_nsWindow backingScaleFactor]);
+}
+
 QMargins QCocoaWindow::frameMargins() const
 {
     NSRect frameW = [m_nsWindow frame];

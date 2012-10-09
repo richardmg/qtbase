@@ -795,6 +795,17 @@ Qt::ScreenOrientation QWindow::windowOrientation() const
 }
 
 /*!
+    Returns the DPI scale factor for the window's backing store.
+*/
+qreal QWindow::dpiScaleFactor() const
+{
+    Q_D(const QWindow);
+    if (!d->platformWindow)
+        return 1.0;
+    return d->platformWindow->dpiScaleFactor() * qhidpiIsEmulationGetScaleFactor();
+}
+
+/*!
     Returns the window state.
 
     \sa setWindowState()

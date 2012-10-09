@@ -361,6 +361,11 @@ Qt::ScreenOrientation QPlatformWindow::requestWindowOrientation(Qt::ScreenOrient
     return Qt::PrimaryOrientation;
 }
 
+qreal QPlatformWindow::dpiScaleFactor() const
+{
+    return 1.0;
+}
+
 bool QPlatformWindow::setKeyboardGrabEnabled(bool grab)
 {
     Q_UNUSED(grab);

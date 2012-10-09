@@ -239,14 +239,9 @@ QPixmapIconEngineEntry *QPixmapIconEngine::bestMatch(const QSize &size, QIcon::M
     return pe;
 }
 
-QPixmap QPixmapIconEngine::pixmap(const QSize &inSize, QIcon::Mode mode, QIcon::State state)
+QPixmap QPixmapIconEngine::pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state)
 {
     QPixmap pm;
-    QSize size = inSize;
-    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
-    if (enableHighdpi)
-        size *= qApp->dpiScaleFactor(); // Don't know which screen at this point.
-
     QPixmapIconEngineEntry *pe = bestMatch(size, mode, state, false);
     if (pe)
         pm = pe->pixmap;
@@ -300,19 +295,12 @@ QPixmap QPixmapIconEngine::pixmap(const QSize &inSize, QIcon::Mode mode, QIcon::
         }
         QPixmapCache::insert(key % HexString<uint>(mode), pm);
     }
-    if (enableHighdpi && pm.size().width() > inSize.width()) // detect high-dpi pixmap
-        pm.setDpiScaleFactor(qMax(qreal(1.0), qreal(pm.size().width()) / qreal(inSize.width())));
 
     return pm;
 }
 
-QSize QPixmapIconEngine::actualSize(const QSize &inSize, QIcon::Mode mode, QIcon::State state)
+QSize QPixmapIconEngine::actualSize(const QSize &size, QIcon::Mode mode, QIcon::State state)
 {
-    QSize size = inSize;
-    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
-    if (enableHighdpi)
-        size *= qApp->dpiScaleFactor(); // Don't know which screen at this point.
-
     QSize actualSize;
     if (QPixmapIconEngineEntry *pe = bestMatch(size, mode, state, true))
         actualSize = pe->size;
@@ -670,13 +658,14 @@ qint64 QIcon::cacheKey() const
   state, generating one if necessary. The pixmap might be smaller than
   requested, but never larger.
 
-  \sa actualSize(), paint()
+  \sa pixmapForWidget, actualSize(), paint()
 */
 QPixmap QIcon::pixmap(const QSize &size, Mode mode, State state) const
 {
     if (!d)
         return QPixmap();
-    return d->engine->pixmap(size, mode, state);
+
+    return pixmap(0, size, mode, state);
 }
 
 /*!
@@ -697,7 +686,8 @@ QPixmap QIcon::pixmap(const QSize &size, Mode mode, State state) const
     than requested, but never larger.
 */
 
-/*!  Returns the actual size of the icon for the requested \a size, \a
+/*!
+  Returns the actual size of the icon for the requested \a size, \a
   mode, and \a state. The result might be smaller than requested, but
   never larger.
 
@@ -707,9 +697,65 @@ QSize QIcon::actualSize(const QSize &size, Mode mode, State state) const
 {
     if (!d)
         return QSize();
-    return d->engine->actualSize(size, mode, state);
+
+    return actualSize(0, size, mode, state);
 }
 
+/*!
+  \since 5.0
+
+  Returns a pixmap with the requested \a window \a size, \a mode, and \a
+  state, generating one if necessary.
+
+  \sa pixmap, actualSize(), paint()
+*/
+QPixmap QIcon::pixmap(QWindow *window, const QSize &size, Mode mode, State state) const
+{
+    if (!d)
+        return QPixmap();
+
+    QSize targetSize = size;
+    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
+    if (enableHighdpi) {
+        if (window)
+            targetSize *= window->dpiScaleFactor();
+        else
+            targetSize *= qApp->dpiScaleFactor(); // Don't know which window to target.
+    }
+
+    QPixmap pixmap = d->engine->pixmap(targetSize, mode, state);
+
+    // Detect high-dpi pixmap and set scale factor.
+    if (enableHighdpi && pixmap.size().width() > size.width())
+        pixmap.setDpiScaleFactor(qMax(qreal(1.0), qreal(pixmap.size().width()) / qreal(size.width())));
+
+    return pixmap;
+}
+
+/*!
+  \since 5.0
+
+  Returns the actual size of the icon for the requested \a window  \a size, \a
+  mode, and \a state.
+
+  \sa actualSize(), pixmap(), paint()
+*/
+QSize QIcon::actualSize(QWindow *window, const QSize &size, Mode mode, State state) const
+{
+    if (!d)
+        return QSize();
+
+    QSize targetSize = size;
+    bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
+    if (enableHighdpi) {
+        if (window)
+            targetSize *= window->dpiScaleFactor();
+        else
+            targetSize *= qApp->dpiScaleFactor(); // Don't know which window to target.
+    }
+
+    return d->engine->actualSize(targetSize, mode, state);
+}
 
 /*!
     Uses the \a painter to paint the icon with specified \a alignment,
