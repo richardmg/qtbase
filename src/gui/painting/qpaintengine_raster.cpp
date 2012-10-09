@@ -2339,6 +2339,22 @@ void QRasterPaintEngine::drawImage(const QRectF &r, const QImage &img, const QRe
                     return;
                 }
             } else {
+                // Test for optimized high-dpi case: 2x source on 2x target. (Could be generalized to nX.)
+                bool sourceRect2x = r.width() * 2 == sr.width() && r.height() * 2 == sr.height();
+                bool scale2x = (s->matrix.m11() == qreal(2)) && (s->matrix.m22() == qreal(2));
+                if (s->matrix.type() == QTransform::TxScale && sourceRect2x && scale2x) {
+                    SrcOverBlendFunc func = qBlendFunctions[d->rasterBuffer->format][img.format()];
+                    if (func) {
+                        QPointF pt(r.x() * 2 + s->matrix.dx(), r.y() * 2 + s->matrix.dy());
+                        if (!clip) {
+                            d->drawImage(pt, img, func, d->deviceRect, s->intOpacity, sr.toRect());
+                            return;
+                        } else if (clip->hasRectClip) {
+                            d->drawImage(pt, img, func, clip->clipRect, s->intOpacity, sr.toRect());
+                            return;
+                        }
+                    }
+                }
                 SrcOverScaleFunc func = qScaleFunctions[d->rasterBuffer->format][img.format()];
                 if (func && (!clip || clip->hasRectClip)) {
                     func(d->rasterBuffer->buffer(), d->rasterBuffer->bytesPerLine(),
