@@ -762,6 +762,14 @@ QImage::QImage(const QSize &size, Format format)
 }
 
 
+QImage QImage::cacheImage(const QSize &pointSize, QWindow *targetWindow)
+{
+    qreal actualScaleFactor = targetWindow ? targetWindow->dpiScaleFactor() : qApp->dpiScaleFactor();
+    QImage cache = QImage(pointSize * actualScaleFactor, QImage::Format_ARGB32_Premultiplied);
+    cache.setDpiScaleFactor(actualScaleFactor);
+    return cache;
+}
+
 
 QImageData *QImageData::create(uchar *data, int width, int height,  int bpl, QImage::Format format, bool readOnly, QImageCleanupFunction cleanupFunction, void *cleanupInfo)
 {
