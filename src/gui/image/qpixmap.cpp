@@ -276,6 +276,21 @@ QPixmap::~QPixmap()
 }
 
 /*!
+    Returns a pixmap suitable for caching contents for drawing to \a targetWindow.
+
+    \a size is in points. The retuned pixmap may be larger than \a size, and
+    may have a dpiScaleFactor different than 1.
+
+*/
+QPixmap QPixmap::cachePixmap(const QSize &pointSize, QWindow *targetWindow)
+{
+    qreal actualScaleFactor = targetWindow ? targetWindow->dpiScaleFactor() : qApp->dpiScaleFactor();
+    QPixmap cache = QPixmap(pointSize * actualScaleFactor);
+    cache.setDpiScaleFactor(actualScaleFactor);
+    return cache;
+}
+
+/*!
   \internal
 */
 int QPixmap::devType() const

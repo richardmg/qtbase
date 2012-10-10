@@ -76,7 +76,7 @@ void PixmapPainter::paintEvent(QPaintEvent *event)
     x+=dx * 2; p.drawImage(QRect(x, y, pixmapPointSize * 2, pixmapPointSize * 2), image1X);
     x+=dx * 2; p.drawImage(QRect(x, y, pixmapPointSize * 2, pixmapPointSize * 2), image2X);
     x+=dx * 2; p.drawImage(QRect(x, y, pixmapPointSize * 2, pixmapPointSize * 2), imageLarge);
-}
+ }
 
 class Labels : public QWidget
 {
@@ -110,10 +110,10 @@ Labels::Labels()
     labelLarge->setPixmap(pixmapLarge);
 
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->addWidget(label1x); //expected low-res on high-dpi displays
+//    layout->addWidget(label1x); //expected low-res on high-dpi displays
     layout->addWidget(label2x);
-    layout->addWidget(labelIcon);
-    layout->addWidget(labelLarge); // expected large size and low-res
+//    layout->addWidget(labelIcon);
+//    layout->addWidget(labelLarge); // expected large size and low-res
     setLayout(layout);
 }
 
@@ -145,7 +145,6 @@ MainWindow::MainWindow()
     fileToolBar->addAction(new QAction(qtIcon2x, QString("2x"), this));
 }
 
-
 class StandardIcons : public QWidget
 {
 public:
@@ -168,6 +167,42 @@ public:
     };
 };
 
+class Caching : public QWidget
+{
+public:
+    void paintEvent(QPaintEvent *event)
+    {
+        QSize layoutSize(75, 75);
+
+        {
+            QPixmap cache = QPixmap::cachePixmap(layoutSize, this->windowHandle());
+
+            QPainter cachedPainter(&cache);
+            cachedPainter.fillRect(QRect(0,0, 75, 75), Qt::blue);
+            cachedPainter.fillRect(QRect(10,10, 55, 55), Qt::red);
+            cachedPainter.drawEllipse(QRect(10,10, 55, 55));
+
+            QPainter widgetPainter(this);
+            widgetPainter.fillRect(QRect(QPoint(0, 0), this->size()), Qt::gray);
+            widgetPainter.drawPixmap(QPoint(10, 10), cache);
+        }
+        {
+            QImage cache = QImage::cacheImage(layoutSize, this->windowHandle());
+
+            QPainter cachedPainter(&cache);
+            cachedPainter.fillRect(QRect(0,0, 75, 75), Qt::blue);
+            cachedPainter.fillRect(QRect(10,10, 55, 55), Qt::red);
+            cachedPainter.drawEllipse(QRect(10,10, 55, 55));
+
+            QPainter widgetPainter(this);
+            widgetPainter.fillRect(QRect(QPoint(0, 0), this->size()), Qt::gray);
+            widgetPainter.drawPixmap(QPoint(85, 10), cache);
+        }
+
+        qDebug() << "layout size" << layoutSize << cache.size();
+    }
+};
+
 int main(int argc, char **argv)
 {
     qputenv("QT_HIGHDPI_AWARE", "1");
@@ -180,14 +215,17 @@ int main(int argc, char **argv)
 
     Labels label;
     label.resize(200, 200);
-    label.show();
+//    label.show();
 
     MainWindow mainWindow;
-    mainWindow.show();
+//    mainWindow.show();
 
     StandardIcons icons;
     icons.resize(510, 510);
-    icons.show();
+//    icons.show();
+
+    Caching ka_ching;
+    ka_ching.show();
 
     return app.exec();
 }
