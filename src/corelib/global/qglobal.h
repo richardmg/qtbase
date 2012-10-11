@@ -1091,6 +1091,9 @@ Q_CORE_EXPORT int qrand();
          "Compile your code with -fPIC or -fPIE."
 #endif
 
+// give the cleanlooks patch something to ifdef on ### remove
+#define QT_HAVE_HIGHDPI_PATCH
+
 namespace QtPrivate {
 //like std::enable_if
 template <bool B, typename T = void> struct QEnableIf;
