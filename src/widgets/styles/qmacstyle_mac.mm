@@ -504,7 +504,7 @@ class QMacCGContext
 {
     CGContextRef context;
 public:
-    QMacCGContext(QPainter *p); //qpaintengine_mac.cpp
+    QMacCGContext(QPainter *p);
     inline QMacCGContext() { context = 0; }
     inline QMacCGContext(const QPaintDevice *pdev) {
         extern CGContextRef qt_mac_cg_context(const QPaintDevice *);
@@ -6667,8 +6667,9 @@ QMacCGContext::QMacCGContext(QPainter *p)
         context = CGBitmapContextCreate((void *) image->bits(), image->width(), image->height(),
                                         8, image->bytesPerLine(), colorspace, flags);
 
+        const qreal scaleFactor = image->dpiScaleFactor();
         CGContextTranslateCTM(context, 0, image->height());
-        CGContextScaleCTM(context, 1, -1);
+        CGContextScaleCTM(context, 1 * scaleFactor, -1 * scaleFactor);
 
         if (devType == QInternal::Widget) {
             QRegion clip = p->paintEngine()->systemClip();
@@ -6682,9 +6683,14 @@ QMacCGContext::QMacCGContext(QPainter *p)
                 else
                     clip &= r;
             }
-            qt_mac_clip_cg(context, clip, 0);
 
-            CGContextTranslateCTM(context, native.dx(), native.dy());
+            if (scaleFactor > 1) {
+                // ### I fail at understanding clipping.
+            } else {
+                qt_mac_clip_cg(context, clip, 0);
+            }
+
+            CGContextTranslateCTM(context, native.dx() / scaleFactor, native.dy() / scaleFactor);
         }
     } else {
         qDebug() << "QMacCGContext:: Unsupported painter devtype type" << devType;
