@@ -174,6 +174,9 @@ public:
     {
         QSize layoutSize(75, 75);
 
+        QPainter widgetPainter(this);
+        widgetPainter.fillRect(QRect(QPoint(0, 0), this->size()), Qt::gray);
+
         {
             QPixmap cache = QPixmap::cachePixmap(layoutSize, this->windowHandle());
 
@@ -183,9 +186,9 @@ public:
             cachedPainter.drawEllipse(QRect(10,10, 55, 55));
 
             QPainter widgetPainter(this);
-            widgetPainter.fillRect(QRect(QPoint(0, 0), this->size()), Qt::gray);
             widgetPainter.drawPixmap(QPoint(10, 10), cache);
         }
+
         {
             QImage cache = QImage::cacheImage(layoutSize, this->windowHandle());
 
@@ -195,11 +198,41 @@ public:
             cachedPainter.drawEllipse(QRect(10,10, 55, 55));
 
             QPainter widgetPainter(this);
-            widgetPainter.fillRect(QRect(QPoint(0, 0), this->size()), Qt::gray);
-            widgetPainter.drawPixmap(QPoint(85, 10), cache);
+            widgetPainter.drawImage(QPoint(95, 10), cache);
         }
 
-        qDebug() << "layout size" << layoutSize << cache.size();
+    }
+};
+
+class Style : public QWidget {
+public:
+    QPushButton *button;
+    QLineEdit *lineEdit;
+    QSlider *slider;
+    QHBoxLayout *row1;
+
+    Style() {
+        row1 = new QHBoxLayout();
+        setLayout(row1);
+
+        button = new QPushButton();
+        button->setText("Test Button");
+        row1->addWidget(button);
+
+        lineEdit = new QLineEdit();
+        lineEdit->setText("Test Lineedit");
+        row1->addWidget(lineEdit);
+
+        slider = new QSlider();
+        row1->addWidget(slider);
+
+        row1->addWidget(new QSpinBox);
+        row1->addWidget(new QScrollBar);
+
+        QTabBar *tab  = new QTabBar();
+        tab->addTab("Foo");
+        tab->addTab("Bar");
+        row1->addWidget(tab);
     }
 };
 
@@ -224,8 +257,12 @@ int main(int argc, char **argv)
     icons.resize(510, 510);
 //    icons.show();
 
-    Caching ka_ching;
-    ka_ching.show();
+    Caching caching;
+    caching.resize(300, 300);
+//    caching.show();
+
+    Style style;
+    style.show();
 
     return app.exec();
 }
