@@ -105,7 +105,7 @@ void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
 
     delete m_image;
     m_image = new QImage(size *scaleFactor, QImage::Format_ARGB32_Premultiplied);
-    m_image->setDpiScaleFactor(scaleFactor);
+    m_image->setDevicePixelRatio(scaleFactor);
 
 //    qDebug() << "resize image to" << m_image->size() << "dpm" << m_image->dotsPerMeterX();
 

@@ -718,16 +718,16 @@ QPixmap QIcon::pixmap(QWindow *window, const QSize &size, Mode mode, State state
     bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
     if (enableHighdpi) {
         if (window)
-            targetSize *= window->dpiScaleFactor();
+            targetSize *= window->devicePixelRatio();
         else
-            targetSize *= qApp->dpiScaleFactor(); // Don't know which window to target.
+            targetSize *= qApp->devicePixelRatio(); // Don't know which window to target.
     }
 
     QPixmap pixmap = d->engine->pixmap(targetSize, mode, state);
 
     // Detect high-dpi pixmap and set scale factor.
     if (enableHighdpi && pixmap.size().width() > size.width())
-        pixmap.setDpiScaleFactor(qMax(qreal(1.0), qreal(pixmap.size().width()) / qreal(size.width())));
+        pixmap.setDevicePixelRatio(qMax(qreal(1.0), qreal(pixmap.size().width()) / qreal(size.width())));
 
     return pixmap;
 }
@@ -749,9 +749,9 @@ QSize QIcon::actualSize(QWindow *window, const QSize &size, Mode mode, State sta
     bool enableHighdpi = (!qgetenv("QT_HIGHDPI_AWARE").isEmpty() || !qgetenv("QT_EMULATED_HIGHDPI").isEmpty());
     if (enableHighdpi) {
         if (window)
-            targetSize *= window->dpiScaleFactor();
+            targetSize *= window->devicePixelRatio();
         else
-            targetSize *= qApp->dpiScaleFactor(); // Don't know which window to target.
+            targetSize *= qApp->devicePixelRatio(); // Don't know which window to target.
     }
 
     return d->engine->actualSize(targetSize, mode, state);

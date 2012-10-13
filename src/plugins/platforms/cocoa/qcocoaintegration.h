@@ -68,7 +68,7 @@ public:
     int depth() const { return m_depth; }
     QImage::Format format() const { return m_format; }
     QDpi logicalDpi() const;
-    qreal dpiScaleFactor() const;
+    qreal devicePixelRatio() const;
     QSizeF physicalSize() const { return m_physicalSize; }
     QPlatformCursor *cursor() const  { return m_cursor; }
 

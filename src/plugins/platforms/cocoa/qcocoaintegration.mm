@@ -98,7 +98,7 @@ QDpi QCocoaScreen::logicalDpi() const
     return QDpi(defaltScreenDPI, defaltScreenDPI);
 }
 
-qreal QCocoaScreen::dpiScaleFactor() const
+qreal QCocoaScreen::devicePixelRatio() const
 {
     return qreal([m_screen backingScaleFactor]);
 }

@@ -361,7 +361,7 @@ Qt::ScreenOrientation QPlatformWindow::requestWindowOrientation(Qt::ScreenOrient
     return Qt::PrimaryOrientation;
 }
 
-qreal QPlatformWindow::dpiScaleFactor() const
+qreal QPlatformWindow::devicePixelRatio() const
 {
     return 1.0;
 }

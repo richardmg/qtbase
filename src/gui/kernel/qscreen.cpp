@@ -214,10 +214,10 @@ qreal QScreen::logicalDotsPerInch() const
     return (dpi.first + dpi.second) * qreal(0.5);
 }
 
-qreal QScreen::dpiScaleFactor() const
+qreal QScreen::devicePixelRatio() const
 {
     Q_D(const QScreen);
-    return d->platformScreen->dpiScaleFactor() * qhidpiIsEmulationGetScaleFactor();
+    return d->platformScreen->devicePixelRatio() * qhidpiIsEmulationGetScaleFactor();
 }
 
 /*!

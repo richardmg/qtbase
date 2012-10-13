@@ -6667,7 +6667,7 @@ QMacCGContext::QMacCGContext(QPainter *p)
         context = CGBitmapContextCreate((void *) image->bits(), image->width(), image->height(),
                                         8, image->bytesPerLine(), colorspace, flags);
 
-        const qreal scaleFactor = image->dpiScaleFactor();
+        const qreal scaleFactor = image->devicePixelRatio();
         CGContextTranslateCTM(context, 0, image->height());
         CGContextScaleCTM(context, 1 * scaleFactor, -1 * scaleFactor);
 

@@ -279,14 +279,14 @@ QPixmap::~QPixmap()
     Returns a pixmap suitable for caching contents for drawing to \a targetWindow.
 
     \a size is in points. The retuned pixmap may be larger than \a size, and
-    may have a dpiScaleFactor different than 1.
+    may have a devicePixelRatio different than 1.
 
 */
 QPixmap QPixmap::cachePixmap(const QSize &pointSize, QWindow *targetWindow)
 {
-    qreal actualScaleFactor = targetWindow ? targetWindow->dpiScaleFactor() : qApp->dpiScaleFactor();
+    qreal actualScaleFactor = targetWindow ? targetWindow->devicePixelRatio() : qApp->devicePixelRatio();
     QPixmap cache = QPixmap(pointSize * actualScaleFactor);
-    cache.setDpiScaleFactor(actualScaleFactor);
+    cache.setDevicePixelRatio(actualScaleFactor);
     return cache;
 }
 
@@ -665,11 +665,11 @@ void QPixmap::setMask(const QBitmap &mask)
 
     \sa setScaleFactor(), QIcon::pixmap()
 */
-qreal QPixmap::dpiScaleFactor() const
+qreal QPixmap::devicePixelRatio() const
 {
     if (!data)
         return qreal(1.0);
-    return data->dpiScaleFactor();
+    return data->devicePixelRatio();
 }
 
 /*!
@@ -690,10 +690,10 @@ qreal QPixmap::dpiScaleFactor() const
 
     \sa scaleFactor()
 */
-void QPixmap::setDpiScaleFactor(qreal scaleFactor)
+void QPixmap::setDevicePixelRatio(qreal scaleFactor)
 {
     detach();
-    data->setDpiScaleFactor(scaleFactor);
+    data->setDevicePixelRatio(scaleFactor);
 }
 
 #ifndef QT_NO_IMAGE_HEURISTIC_MASK

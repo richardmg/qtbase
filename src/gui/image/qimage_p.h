@@ -74,7 +74,7 @@ struct Q_GUI_EXPORT QImageData {        // internal image data
     int height;
     int depth;
     int nbytes;               // number of bytes data
-    qreal dpiScaleFactor;
+    qreal devicePixelRatio;
     QVector<QRgb> colortable;
     uchar *data;
     QImage::Format format;

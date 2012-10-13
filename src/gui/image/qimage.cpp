@@ -95,7 +95,7 @@ static QImage rotated270(const QImage &src);
 QBasicAtomicInt qimage_serial_number = Q_BASIC_ATOMIC_INITIALIZER(1);
 
 QImageData::QImageData()
-    : ref(0), width(0), height(0), depth(0), nbytes(0), dpiScaleFactor(1.0), data(0),
+    : ref(0), width(0), height(0), depth(0), nbytes(0), devicePixelRatio(1.0), data(0),
       format(QImage::Format_ARGB32), bytes_per_line(0),
       ser_no(qimage_serial_number.fetchAndAddRelaxed(1)),
       detach_no(0),
@@ -764,9 +764,9 @@ QImage::QImage(const QSize &size, Format format)
 
 QImage QImage::cacheImage(const QSize &pointSize, QWindow *targetWindow)
 {
-    qreal actualScaleFactor = targetWindow ? targetWindow->dpiScaleFactor() : qApp->dpiScaleFactor();
+    qreal actualScaleFactor = targetWindow ? targetWindow->devicePixelRatio() : qApp->devicePixelRatio();
     QImage cache = QImage(pointSize * actualScaleFactor, QImage::Format_ARGB32_Premultiplied);
-    cache.setDpiScaleFactor(actualScaleFactor);
+    cache.setDevicePixelRatio(actualScaleFactor);
     return cache;
 }
 
@@ -1227,7 +1227,7 @@ QImage QImage::copy(const QRect& r) const
 
     image.d->dpmx = dotsPerMeterX();
     image.d->dpmy = dotsPerMeterY();
-    image.d->dpiScaleFactor = dpiScaleFactor();
+    image.d->devicePixelRatio = devicePixelRatio();
     image.d->offset = offset();
     image.d->has_alpha_clut = d->has_alpha_clut;
     image.d->text = d->text;
@@ -1393,11 +1393,11 @@ QVector<QRgb> QImage::colorTable() const
 
     \sa setScaleFactor()
 */
-qreal QImage::dpiScaleFactor() const
+qreal QImage::devicePixelRatio() const
 {
     if (!d)
         return 1.0;
-    return d->dpiScaleFactor;
+    return d->devicePixelRatio;
 }
 
 /*!
@@ -1418,12 +1418,12 @@ qreal QImage::dpiScaleFactor() const
 
     \sa scaleFactor()
 */
-void QImage::setDpiScaleFactor(qreal scaleFactor)
+void QImage::setDevicePixelRatio(qreal scaleFactor)
 {
     if (!d)
         return;
     detach();
-    d->dpiScaleFactor = scaleFactor;
+    d->devicePixelRatio = scaleFactor;
 }
 
 /*!
@@ -3416,7 +3416,7 @@ QImage QImage::convertToFormat(Format format, Qt::ImageConversionFlags flags) co
 
         image.setDotsPerMeterY(dotsPerMeterY());
         image.setDotsPerMeterX(dotsPerMeterX());
-        image.setDpiScaleFactor(dpiScaleFactor());
+        image.setDevicePixelRatio(devicePixelRatio());
 
         image.d->text = d->text;
 
@@ -3537,7 +3537,7 @@ QImage QImage::convertToFormat(Format format, const QVector<QRgb> &colorTable, Q
 
     QImage image(d->width, d->height, format);
     QIMAGE_SANITYCHECK_MEMORY(image);
-    image.setDpiScaleFactor(dpiScaleFactor());
+    image.setDevicePixelRatio(devicePixelRatio());
 
     image.d->text = d->text;
 
@@ -5016,11 +5016,11 @@ int QImage::metric(PaintDeviceMetric metric) const
         break;
 
     case PdmPhysicalDpiX:
-        return qRound(d->dpmx * 0.0254 * d->dpiScaleFactor);
+        return qRound(d->dpmx * 0.0254 * d->devicePixelRatio);
         break;
 
     case PdmPhysicalDpiY:
-        return qRound(d->dpmy * 0.0254 * d->dpiScaleFactor);
+        return qRound(d->dpmy * 0.0254 * d->devicePixelRatio);
         break;
 
     default:
@@ -5721,7 +5721,7 @@ QImage QImage::transformed(const QTransform &matrix, Qt::TransformationMode mode
 
     dImage.d->dpmx = dotsPerMeterX();
     dImage.d->dpmy = dotsPerMeterY();
-    dImage.d->dpiScaleFactor = dpiScaleFactor();
+    dImage.d->devicePixelRatio = devicePixelRatio();
 
     switch (bpp) {
         // initizialize the data

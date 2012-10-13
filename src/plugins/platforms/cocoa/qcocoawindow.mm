@@ -768,7 +768,7 @@ QCocoaMenuBar *QCocoaWindow::menubar() const
     return m_menubar;
 }
 
-qreal QCocoaWindow::dpiScaleFactor() const
+qreal QCocoaWindow::devicePixelRatio() const
 {
     if (!m_nsWindow)
         return 1.0;

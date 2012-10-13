@@ -79,8 +79,8 @@ public:
     QImage toImage(const QRect &rect) const;
     QPaintEngine* paintEngine() const;
     QImage* buffer();
-    qreal dpiScaleFactor() const;
-    void setDpiScaleFactor(qreal scaleFactor);
+    qreal devicePixelRatio() const;
+    void setDevicePixelRatio(qreal scaleFactor);
 
 
 protected:

@@ -662,16 +662,16 @@ QList<QScreen *> QGuiApplication::screens()
 /*!
     Returns the highest display scale factor found on the system.
 
-    Don't use this function unless you have to. Use QScreen::dpiScaleFactor()
+    Don't use this function unless you have to. Use QScreen::devicePixelRatio()
     instead and target a specific screen.
 
-    \sa QScreen::dpiScaleFactor();
+    \sa QScreen::devicePixelRatio();
 */
-qreal QGuiApplication::dpiScaleFactor() const
+qreal QGuiApplication::devicePixelRatio() const
 {
     qreal topScaleFactor = 1.0;
     foreach (QScreen *screen, QGuiApplicationPrivate::screen_list) {
-        topScaleFactor = qMax(topScaleFactor, screen->dpiScaleFactor());
+        topScaleFactor = qMax(topScaleFactor, screen->devicePixelRatio());
     }
     return topScaleFactor;
 }

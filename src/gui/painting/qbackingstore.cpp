@@ -125,8 +125,8 @@ QPaintDevice *QBackingStore::paintDevice()
         // emulated scale factor here, but the paintDevice() accessor is
         // called multiple times on the same image so we would be accumulating
         // scale factor changes.
-        if (image->dpiScaleFactor() < 2)
-            image->setDpiScaleFactor(qhidpiIsEmulationGetScaleFactor());
+        if (image->devicePixelRatio() < 2)
+            image->setDevicePixelRatio(qhidpiIsEmulationGetScaleFactor());
     }
 
     return device;
