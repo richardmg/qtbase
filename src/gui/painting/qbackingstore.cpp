@@ -211,7 +211,7 @@ bool QBackingStore::scroll(const QRegion &area, int dx, int dy)
     Q_UNUSED(dx);
     Q_UNUSED(dy);
 
-    return d_ptr->platformBackingStore->scroll(qhidpiPointToPixel(area), dx, dy);
+    return d_ptr->platformBackingStore->scroll(qhidpiPointToPixel(area), qhidpiPointToPixel(dx), qhidpiPointToPixel(dy));
 }
 
 void QBackingStore::setStaticContents(const QRegion &region)
