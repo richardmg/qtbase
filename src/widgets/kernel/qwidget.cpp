@@ -5006,12 +5006,12 @@ void QWidgetPrivate::drawWidget(QPaintDevice *pdev, const QRegion &rgn, const QP
             sourced->context = &context;
             if (!sharedPainter) {
                 QPaintEngine *paintEngine = pdev->paintEngine();
-                paintEngine->d_func()->systemClip = rgn.translated(offset);
+                paintEngine->setSystemClip(rgn.translated(offset));
                 QPainter p(pdev);
                 p.translate(offset);
                 context.painter = &p;
                 graphicsEffect->draw(&p);
-                paintEngine->d_func()->systemClip = QRegion();
+                paintEngine->setSystemClip(QRegion());
             } else {
                 context.painter = sharedPainter;
                 if (sharedPainter->worldTransform() != sourced->lastEffectTransform) {
@@ -5068,7 +5068,7 @@ void QWidgetPrivate::drawWidget(QPaintDevice *pdev, const QRegion &rgn, const QP
 
 #endif
                 if (sharedPainter)
-                    paintEngine->d_func()->systemClip = toBePainted;
+                    paintEngine->setSystemClip(toBePainted);
                 else
                     paintEngine->d_func()->systemRect = q->data->crect;
 
@@ -5080,7 +5080,7 @@ void QWidgetPrivate::drawWidget(QPaintDevice *pdev, const QRegion &rgn, const QP
                 }
 
                 if (!sharedPainter)
-                    paintEngine->d_func()->systemClip = toBePainted.translated(offset);
+                    paintEngine->setSystemClip(toBePainted.translated(offset));
 
                 if (!onScreen && !asRoot && !isOpaque && q->testAttribute(Qt::WA_TintedBackground)) {
                     QPainter p(q);
@@ -5115,7 +5115,7 @@ void QWidgetPrivate::drawWidget(QPaintDevice *pdev, const QRegion &rgn, const QP
                     paintEngine->d_func()->systemRect = QRect();
                 else
                     paintEngine->d_func()->currentClipDevice = 0;
-                paintEngine->d_func()->systemClip = QRegion();
+                paintEngine->setSystemClip(QRegion());
             }
             q->setAttribute(Qt::WA_WState_InPaintEvent, false);
             if (q->paintingActive())

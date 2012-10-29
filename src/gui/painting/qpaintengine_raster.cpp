@@ -1072,9 +1072,11 @@ void QRasterPaintEnginePrivate::systemStateChanged()
     exDeviceRect = deviceRect;
 
     Q_Q(QRasterPaintEngine);
-    q->state()->strokeFlags |= QPaintEngine::DirtyClipRegion;
-    q->state()->fillFlags |= QPaintEngine::DirtyClipRegion;
-    q->state()->pixmapFlags |= QPaintEngine::DirtyClipRegion;
+    if (q->state()) {
+        q->state()->strokeFlags |= QPaintEngine::DirtyClipRegion;
+        q->state()->fillFlags |= QPaintEngine::DirtyClipRegion;
+        q->state()->pixmapFlags |= QPaintEngine::DirtyClipRegion;
+    }
 }
 
 void QRasterPaintEnginePrivate::updateMatrixData(QSpanData *spanData, const QBrush &b, const QTransform &m)
