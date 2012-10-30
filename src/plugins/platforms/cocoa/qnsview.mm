@@ -90,6 +90,14 @@ static QTouchDevice *touchDevice = 0;
     return self;
 }
 
+- (void)dealloc
+{
+    CGImageRelease(m_cgImage);
+    m_cgImage = 0;
+    m_window = 0;
+    [super dealloc];
+}
+
 - (id)initWithQWindow:(QWindow *)window platformWindow:(QCocoaWindow *) platformWindow
 {
     self = [self init];
@@ -130,22 +138,31 @@ static QTouchDevice *touchDevice = 0;
 
 - (void)updateGeometry
 {
-    NSRect rect = [self frame];
-    NSRect windowRect = [[self window] frame];
-    QRect geo(windowRect.origin.x, qt_mac_flipYCoordinate(windowRect.origin.y + rect.size.height), rect.size.width, rect.size.height);
+    QRect geometry;
+    if (m_platformWindow->m_nsWindow) {
+        // top level window, get window rect and flip y.
+        NSRect rect = [self frame];
+        NSRect windowRect = [[self window] frame];
+        geometry = QRect(windowRect.origin.x, qt_mac_flipYCoordinate(windowRect.origin.y + rect.size.height), rect.size.width, rect.size.height);
+    } else {
+        // child window, use the frame rect
+        geometry = qt_mac_toQRect([self frame]);
+    }
 
 #ifdef QT_COCOA_ENABLE_WINDOW_DEBUG
-    qDebug() << "QNSView::udpateGeometry" << geo;
+    qDebug() << "QNSView::udpateGeometry" << m_platformWindow << geometry;
 #endif
 
     // Call setGeometry on QPlatformWindow. (not on QCocoaWindow,
     // doing that will initiate a geometry change it and possibly create
     // an infinite loop when this notification is triggered again.)
-    m_platformWindow->QPlatformWindow::setGeometry(geo);
+    m_platformWindow->QPlatformWindow::setGeometry(geometry);
 
     // Send a geometry change event to Qt, if it's ready to handle events
-    if (!m_platformWindow->m_inConstructor)
-        QWindowSystemInterface::handleSynchronousGeometryChange(m_window, geo);
+    if (!m_platformWindow->m_inConstructor) {
+        QWindowSystemInterface::handleGeometryChange(m_window, geometry);
+        QWindowSystemInterface::flushWindowSystemEvents();
+    }
 }
 
 - (void)windowNotification : (NSNotification *) windowNotification
@@ -193,12 +210,20 @@ static QTouchDevice *touchDevice = 0;
 {
     CGImageRelease(m_cgImage);
 
+    int width = image->width();
+    int height = image->height();
+
+    if (width <= 0 || height <= 0) {
+        qWarning() << Q_FUNC_INFO <<
+            "setting invalid size" << width << "x" << height << "for qnsview image";
+        m_cgImage = 0;
+        return;
+    }
+
     const uchar *imageData = image->bits();
     int bitDepth = image->depth();
     int colorBufferSize = 8;
     int bytesPrLine = image->bytesPerLine();
-    int width = image->width();
-    int height = image->height();
 
     CGColorSpaceRef cgColourSpaceRef = CGColorSpaceCreateDeviceRGB();
 
@@ -346,7 +371,8 @@ static QTouchDevice *touchDevice = 0;
     QCocoaDrag* nativeDrag = static_cast<QCocoaDrag *>(QGuiApplicationPrivate::platformIntegration()->drag());
     nativeDrag->setLastMouseEvent(theEvent, self);
 
-    QWindowSystemInterface::handleMouseEvent(m_window, timestamp, qtWindowPoint, qtScreenPoint, m_buttons);
+    Qt::KeyboardModifiers keyboardModifiers = [self convertKeyModifiers:[theEvent modifierFlags]];
+    QWindowSystemInterface::handleMouseEvent(m_window, timestamp, qtWindowPoint, qtScreenPoint, m_buttons, keyboardModifiers);
 }
 
 - (void)handleFrameStrutMouseEvent:(NSEvent *)theEvent
@@ -371,11 +397,15 @@ static QTouchDevice *touchDevice = 0;
     }
 
     NSWindow *window = [self window];
-    int windowHeight = [window frame].size.height;
     NSPoint windowPoint = [theEvent locationInWindow];
+
+    int windowScreenY = [window frame].origin.y + [window frame].size.height;
+    int viewScreenY = [window convertBaseToScreen:[self convertPoint:[self frame].origin toView:nil]].y;
+    int titleBarHeight = windowScreenY - viewScreenY;
+
     NSPoint nsViewPoint = [self convertPoint: windowPoint fromView: nil];
-    QPoint qtWindowPoint = QPoint(nsViewPoint.x, windowHeight - nsViewPoint.y);
-    NSPoint screenPoint = [window convertBaseToScreen : windowPoint];
+    QPoint qtWindowPoint = QPoint(nsViewPoint.x, titleBarHeight + nsViewPoint.y);
+    NSPoint screenPoint = [window convertBaseToScreen:windowPoint];
     QPoint qtScreenPoint = QPoint(screenPoint.x, qt_mac_flipYCoordinate(screenPoint.y));
 
     ulong timestamp = [theEvent timestamp] * 1000;
@@ -385,7 +415,8 @@ static QTouchDevice *touchDevice = 0;
 - (void)mouseDown:(NSEvent *)theEvent
 {
     if (m_platformWindow->m_activePopupWindow) {
-        QWindowSystemInterface::handleSynchronousCloseEvent(m_platformWindow->m_activePopupWindow);
+        QWindowSystemInterface::handleCloseEvent(m_platformWindow->m_activePopupWindow);
+        QWindowSystemInterface::flushWindowSystemEvents();
         m_platformWindow->m_activePopupWindow = 0;
     }
     if ([self hasMarkedText]) {
@@ -721,7 +752,7 @@ static QTouchDevice *touchDevice = 0;
             text = QCFString::toQString([nsevent characters]);
 
         if (m_composingText.isEmpty())
-            m_sendKeyEvent = !QWindowSystemInterface::tryHandleSynchronousShortcutEvent(m_window, timestamp, keyCode, modifiers, text);
+            m_sendKeyEvent = !QWindowSystemInterface::tryHandleShortcutEvent(m_window, timestamp, keyCode, modifiers, text);
 
         QObject *fo = QGuiApplication::focusObject();
         if (m_sendKeyEvent && fo) {

@@ -673,19 +673,26 @@ GuidMap* DitaXmlGenerator::lookupGuidMap(const QString& fileName)
 void DitaXmlGenerator::generateTree()
 {
     qdb_->buildCollections();
-    Generator::generateTree();
-    generateCollisionPages();
+    if (!runPrepareOnly()) {
+        Generator::generateTree();
+        generateCollisionPages();
+    }
 
-    QString fileBase = project.toLower().simplified().replace(QLatin1Char(' '), QLatin1Char('-'));
-    qdb_->generateIndex(outputDir() + QLatin1Char('/') + fileBase + ".index",
-                        projectUrl,
-                        projectDescription,
-                        this);
-    writeDitaMap();
-    /*
-      Generate the XML tag file, if it was requested.
-     */
-    qdb_->generateTagFile(tagFile_, this);
+    if (!runGenerateOnly()) {
+        QString fileBase = project.toLower().simplified().replace(QLatin1Char(' '), QLatin1Char('-'));
+        qdb_->generateIndex(outputDir() + QLatin1Char('/') + fileBase + ".index",
+                            projectUrl,
+                            projectDescription,
+                            this);
+    }
+
+    if (!runPrepareOnly()) {
+        writeDitaMap();
+        /*
+          Generate the XML tag file, if it was requested.
+        */
+        qdb_->generateTagFile(tagFile_, this);
+    }
 }
 
 static int countTableColumns(const Atom* t)
@@ -1337,7 +1344,7 @@ int DitaXmlGenerator::generateAtom(const Atom *atom,
             QString myLink = getLink(atom, relative, &node);
             if (myLink.isEmpty())
                 myLink = getCollisionLink(atom);
-            if (myLink.isEmpty())
+            if (myLink.isEmpty() && !noLinkErrors())
                 relative->doc().location().warning(tr("Can't link to '%1'").arg(atom->string()));
             else if (!inSectionHeading_)
                 beginLink(myLink);
@@ -3766,15 +3773,6 @@ QString DitaXmlGenerator::linkForNode(const Node* node, const Node* relative)
     return link;
 }
 
-QString DitaXmlGenerator::refForAtom(Atom* atom, const Node* /* node */)
-{
-    if (atom->type() == Atom::SectionLeft)
-        return Doc::canonicalTitle(Text::sectionHeading(atom).toString());
-    if (atom->type() == Atom::Target)
-        return Doc::canonicalTitle(atom->string());
-    return QString();
-}
-
 void DitaXmlGenerator::generateFullName(const Node* apparentNode,
                                         const Node* relative,
                                         const Node* actualNode)
@@ -3855,7 +3853,7 @@ QString DitaXmlGenerator::getLink(const Atom* atom, const Node* relative, const 
         else
             path.append(atom->string());
 
-        Atom* targetAtom = 0;
+        QString ref;
         QString first = path.first().trimmed();
 
         if (first.isEmpty()) {
@@ -3869,7 +3867,7 @@ QString DitaXmlGenerator::getLink(const Atom* atom, const Node* relative, const 
             if (!*node)
                 *node = qdb_->findDocNodeByTitle(first, relative);
             if (!*node)
-                *node = qdb_->findUnambiguousTarget(first, targetAtom, relative);
+                *node = qdb_->findUnambiguousTarget(first, ref, relative);
         }
 
         if (*node) {
@@ -3903,8 +3901,8 @@ QString DitaXmlGenerator::getLink(const Atom* atom, const Node* relative, const 
         }
 
         while (!path.isEmpty()) {
-            targetAtom = qdb_->findTarget(path.first(), *node);
-            if (targetAtom == 0)
+            ref = qdb_->findTarget(path.first(), *node);
+            if (ref.isEmpty())
                 break;
             path.removeFirst();
         }
@@ -3913,10 +3911,10 @@ QString DitaXmlGenerator::getLink(const Atom* atom, const Node* relative, const 
             link = linkForNode(*node, relative);
             if (*node && (*node)->subType() == Node::Image)
                 link = "images/used-in-examples/" + link;
-            if (targetAtom) {
+            if (!ref.isEmpty()) {
                 if (link.isEmpty())
                     link = outFileName();
-                QString guid = lookupGuid(link,refForAtom(targetAtom,*node));
+                QString guid = lookupGuid(link, ref);
                 link += QLatin1Char('#') + guid;
             }
             else if (!link.isEmpty() && *node && (link.endsWith(".xml") || link.endsWith(".dita"))) {
@@ -3952,16 +3950,16 @@ void DitaXmlGenerator::generateStatus(const Node* node, CodeMarker* marker)
                  << "using it in new code. See ";
 
             const DocNode *docNode = qdb_->findDocNodeByTitle("Porting To Qt 4");
-            Atom *targetAtom = 0;
+            QString ref;
             if (docNode && node->type() == Node::Class) {
                 QString oldName(node->name());
                 oldName.remove(QLatin1Char('3'));
-                targetAtom = qdb_->findTarget(oldName,docNode);
+                ref = qdb_->findTarget(oldName,docNode);
             }
 
-            if (targetAtom) {
+            if (!ref.isEmpty()) {
                 QString fn = fileName(docNode);
-                QString guid = lookupGuid(fn,refForAtom(targetAtom,docNode));
+                QString guid = lookupGuid(fn, ref);
                 text << Atom(Atom::GuidLink, fn + QLatin1Char('#') + guid);
             }
             else

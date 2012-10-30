@@ -119,7 +119,9 @@ QXcbIntegration::QXcbIntegration(const QStringList &parameters)
 
 QXcbIntegration::~QXcbIntegration()
 {
+#if !defined(QT_NO_OPENGL) && defined(XCB_USE_GLX)
     qDeleteAll(m_defaultContextInfos);
+#endif
     qDeleteAll(m_connections);
 }
 
@@ -188,11 +190,11 @@ QPlatformOpenGLContext *QXcbIntegration::createPlatformOpenGLContext(QOpenGLCont
 #elif defined(XCB_USE_EGL)
     return new QEGLXcbPlatformContext(context->format(), context->shareHandle(),
         screen->connection()->egl_display(), screen->connection());
-#elif defined(XCB_USE_DRI2)
-    return new QDri2Context(context->format(), context->shareHandle());
-#endif
-    qWarning("QXcbIntegration: Cannot create platform OpenGL context, none of GLX, EGL, or DRI2 are enabled");
+#else
+    Q_UNUSED(screen);
+    qWarning("QXcbIntegration: Cannot create platform OpenGL context, neither GLX nor EGL are enabled");
     return 0;
+#endif
 }
 #endif
 
@@ -205,7 +207,13 @@ bool QXcbIntegration::hasCapability(QPlatformIntegration::Capability cap) const
 {
     switch (cap) {
     case ThreadedPixmaps: return true;
+#if defined(XCB_USE_GLX)
+    case OpenGL: return m_connections.at(0)->hasGLX();
+#elif defined(XCB_USE_EGL)
     case OpenGL: return true;
+#else
+    case OpenGL: return false;
+#endif
     case ThreadedOpenGL: return false;
     case WindowMasks: return true;
     default: return QPlatformIntegration::hasCapability(cap);
@@ -267,8 +275,8 @@ QPlatformServices *QXcbIntegration::services() const
 Qt::KeyboardModifiers QXcbIntegration::queryKeyboardModifiers() const
 {
     int keybMask = 0;
-    QXcbConnection* conn = m_connections.at(0);
-    QXcbCursor::queryPointer(conn->xcb_connection(), 0, 0, &keybMask);
+    QXcbConnection *conn = m_connections.at(0);
+    QXcbCursor::queryPointer(conn, 0, 0, &keybMask);
     return conn->keyboard()->translateModifiers(keybMask);
 }
 
@@ -289,10 +297,14 @@ QPlatformTheme *QXcbIntegration::createPlatformTheme(const QString &name) const
 */
 void QXcbIntegration::removeDefaultOpenGLContextInfo(QXcbScreen *screen)
 {
+#if !defined(QT_NO_OPENGL) && defined(XCB_USE_GLX)
     if (!m_defaultContextInfos.contains(screen))
         return;
     QOpenGLDefaultContextInfo* info = m_defaultContextInfos.take(screen);
     delete info;
+#else
+    Q_UNUSED(screen);
+#endif
 }
 
 QT_END_NAMESPACE

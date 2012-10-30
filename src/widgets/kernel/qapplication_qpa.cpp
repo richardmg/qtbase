@@ -77,6 +77,7 @@ extern QWidget *qt_button_down;
 extern QWidget *qt_popup_down;
 extern bool qt_replay_popup_mouse_event;
 int openPopupCount = 0;
+extern QPointer<QWidget> qt_last_mouse_receiver;
 
 void QApplicationPrivate::createEventDispatcher()
 {
@@ -249,6 +250,12 @@ void QApplicationPrivate::openPopup(QWidget *popup)
             QApplication::sendEvent(fw, &e);
         }
     }
+
+    // Dispatch leave for last mouse receiver to update undermouse states
+    if (qt_last_mouse_receiver && !QWidget::mouseGrabber()) {
+        QApplicationPrivate::dispatchEnterLeave(0, qt_last_mouse_receiver.data());
+        qt_last_mouse_receiver = 0;
+    }
 }
 
 void QApplicationPrivate::initializeMultitouch_sys()
@@ -387,7 +394,6 @@ bool QApplication::isEffectEnabled(Qt::UIEffect effect)
     return QColormap::instance().depth() >= 16
            && (QApplicationPrivate::enabledAnimations & QPlatformTheme::GeneralUiEffect)
            && (QApplicationPrivate::enabledAnimations & uiEffectToFlag(effect));
-        return false;
 }
 
 QWidget *QApplication::topLevelAt(const QPoint &pos)

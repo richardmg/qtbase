@@ -71,6 +71,7 @@
 
 #include <qpa/qwindowsysteminterface.h>
 
+#include "../../../qtest-config.h"
 
 QT_BEGIN_NAMESPACE
 static QWindowSystemInterface::TouchPoint touchPoint(const QTouchEvent::TouchPoint& pt)
@@ -100,7 +101,7 @@ static QList<struct QWindowSystemInterface::TouchPoint> touchPointList(const QLi
 
 
 
-extern bool Q_GUI_EXPORT qt_tab_all_widgets; // from qapplication.cpp
+extern bool Q_GUI_EXPORT qt_tab_all_widgets(); // from qapplication.cpp
 QT_END_NAMESPACE
 
 class tst_QApplication : public QObject
@@ -516,6 +517,8 @@ void tst_QApplication::args()
     QCOMPARE( argv_out, args_out );
 
     delete [] argv;
+    // Make sure we switch back to native style.
+    QApplicationPrivate::styleOverride = QString();
 }
 
 void tst_QApplication::appName()
@@ -1510,7 +1513,7 @@ void tst_QApplication::focusChanged()
     int argc = 0;
     QApplication app(argc, 0, QApplication::GuiServer);
 
-    QSignalSpy spy(&app, SIGNAL(focusChanged(QWidget *, QWidget *)));
+    QSignalSpy spy(&app, SIGNAL(focusChanged(QWidget*,QWidget*)));
     QWidget *now = 0;
     QWidget *old = 0;
 
@@ -1595,14 +1598,10 @@ void tst_QApplication::focusChanged()
     QSettings appleSettings(QLatin1String("apple.com"));
     QVariant appleValue = appleSettings.value(QLatin1String("AppleKeyboardUIMode"), 0);
     tabAllControls = (appleValue.toInt() & 0x2);
-    if (!tabAllControls) {
-        QEXPECT_FAIL("", "QTBUG-24372 Mac tab key \"Text boxes and lists only\" vs "
-                         "\"All controls\" setting is not respected in Qt5", Abort);
-    }
 #endif
 
     // make sure Qt's idea of tabbing between widgets matches what we think it should
-    QCOMPARE(qt_tab_all_widgets, tabAllControls);
+    QCOMPARE(qt_tab_all_widgets(), tabAllControls);
 
     tab.simulate(now);
     if (!tabAllControls) {
@@ -2233,7 +2232,9 @@ Q_GLOBAL_STATIC(QPixmap, tst_qapp_pixmap);
 Q_GLOBAL_STATIC(QFont, tst_qapp_font);
 Q_GLOBAL_STATIC(QRegion, tst_qapp_region);
 Q_GLOBAL_STATIC(QFontDatabase, tst_qapp_fontDatabase);
+#ifndef QTEST_NO_CURSOR
 Q_GLOBAL_STATIC(QCursor, tst_qapp_cursor);
+#endif
 
 void tst_QApplication::globalStaticObjectDestruction()
 {
@@ -2252,7 +2253,9 @@ void tst_QApplication::globalStaticObjectDestruction()
     QVERIFY(tst_qapp_font());
     QVERIFY(tst_qapp_region());
     QVERIFY(tst_qapp_fontDatabase());
+#ifndef QTEST_NO_CURSOR
     QVERIFY(tst_qapp_cursor());
+#endif
 }
 
 //QTEST_APPLESS_MAIN(tst_QApplication)

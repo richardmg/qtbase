@@ -70,10 +70,6 @@
 extern bool qt_wince_is_mobile(); //defined in qguifunctions_wce.cpp
 #endif
 
-#ifdef QT_SOFTKEYS_ENABLED
-#include <private/qsoftkeymanager_p.h>
-#endif
-
 QT_BEGIN_NAMESPACE
 
 class QMenuBarExtension : public QToolButton
@@ -623,17 +619,6 @@ void QMenuBar::initStyleOption(QStyleOptionMenuItem *option, const QAction *acti
     for items in the menu bar are only shown when the \uicontrol{Alt} key is
     pressed.
 
-    \table
-
-    \row \li \inlineimage plastique-menubar.png A menu bar shown in the
-    Plastique widget style.
-
-    \li The \l{QPlastiqueStyle}{Plastique widget style}, like most
-    other styles, handles the \uicontrol{Help} menu in the same way as it
-    handles any other menu.
-
-    \endtable
-
     \section1 QMenuBar on Mac OS X
 
     QMenuBar on Mac OS X is a wrapper for using the system-wide menu bar.
@@ -730,9 +715,6 @@ void QMenuBarPrivate::init()
 #endif
     q->setBackgroundRole(QPalette::Button);
     oldWindow = oldParent = 0;
-#ifdef QT_SOFTKEYS_ENABLED
-    menuBarAction = 0;
-#endif
     handleReparent();
     q->setMouseTracking(q->style()->styleHint(QStyle::SH_MenuBar_MouseTracking, 0, q));
 
@@ -1296,6 +1278,8 @@ void QMenuBar::actionEvent(QActionEvent *e)
                 }
             } else if (menu) {
                 menu->setText(e->action()->text());
+                menu->setVisible(e->action()->isVisible());
+                menu->setEnabled(e->action()->isEnabled());
                 d->platformMenuBar->syncMenu(menu);
             }
         }
@@ -1414,11 +1398,6 @@ void QMenuBar::changeEvent(QEvent *e)
                || e->type() == QEvent::ApplicationFontChange) {
         d->itemsDirty = true;
         d->updateGeometries();
-#ifdef QT_SOFTKEYS_ENABLED
-    } else if (e->type() == QEvent::LanguageChange) {
-        if (d->menuBarAction)
-            d->menuBarAction->setText(QSoftKeyManager::standardSoftKeyText(QSoftKeyManager::MenuSoftKey));
-#endif
     }
 
     QWidget::changeEvent(e);

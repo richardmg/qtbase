@@ -47,6 +47,7 @@
 #undef check
 
 #include "qmacstyle_mac.h"
+#include "qcommonstyle_p.h"
 #include <private/qapplication_p.h>
 #include <private/qcombobox_p.h>
 #include <private/qpainter_p.h>
@@ -138,12 +139,11 @@ enum QAquaWidgetSize { QAquaSizeLarge = 0, QAquaSizeSmall = 1, QAquaSizeMini = 2
 
 bool qt_mac_buttonIsRenderedFlat(const QPushButton *pushButton, const QStyleOptionButton *option);
 
-class QMacStylePrivate : public QObject
+class QMacStylePrivate : public QCommonStylePrivate
 {
-    Q_OBJECT
-
+    Q_DECLARE_PUBLIC(QMacStyle)
 public:
-    QMacStylePrivate(QMacStyle *style);
+    QMacStylePrivate();
 
     // Ideally these wouldn't exist, but since they already exist we need some accessors.
     static const int PushButtonLeftOffset;
@@ -160,19 +160,14 @@ public:
 
     // Stuff from QAquaAnimate:
     bool addWidget(QWidget *);
-    void removeWidget(QWidget *);
 
     enum Animates { AquaPushButton, AquaProgressBar, AquaListViewItemOpen, AquaScrollBar };
-    bool animatable(Animates, const QWidget *) const;
-    void stopAnimate(Animates, QWidget *);
-    void startAnimate(Animates, QWidget *);
     static ThemeDrawState getDrawState(QStyle::State flags);
     QAquaWidgetSize aquaSizeConstrain(const QStyleOption *option, const QWidget *widg,
                              QStyle::ContentsType ct = QStyle::CT_CustomBase,
                              QSize szHint=QSize(-1, -1), QSize *insz = 0) const;
     void getSliderInfo(QStyle::ComplexControl cc, const QStyleOptionSlider *slider,
-                          HIThemeTrackDrawInfo *tdi, const QWidget *needToRemoveMe);
-    bool doAnimate(Animates);
+                          HIThemeTrackDrawInfo *tdi, const QWidget *needToRemoveMe) const;
     inline int animateSpeed(Animates) const { return 33; }
 
     // Utility functions
@@ -185,7 +180,7 @@ public:
                                    const HIThemeButtonDrawInfo *bdi) const;
 
     void initComboboxBdi(const QStyleOptionComboBox *combo, HIThemeButtonDrawInfo *bdi,
-                        const QWidget *widget, const ThemeDrawState &tds);
+                        const QWidget *widget, const ThemeDrawState &tds) const;
 
     static HIRect comboboxInnerBounds(const HIRect &outerBounds, int buttonKind);
 
@@ -200,48 +195,41 @@ public:
                                const ThemeDrawState tds,
                                HIThemeButtonDrawInfo *bdi) const;
     QPixmap generateBackgroundPattern() const;
-protected:
-    bool eventFilter(QObject *, QEvent *);
-    void timerEvent(QTimerEvent *);
-
-private slots:
-    void startAnimationTimer();
 
 public:
-    QPointer<QPushButton> defaultButton; //default push buttons
-    int timerID;
-    QList<QPointer<QWidget> > progressBars; //existing progress bars that need animation
-    QList<QPointer<QWidget> > scrollBars; //existing scroll bars that need animation
+    mutable QPointer<QObject> pressedButton;
+    mutable QPointer<QObject> defaultButton;
+    mutable QPointer<QObject> autoDefaultButton;
 
     struct OverlayScrollBarInfo {
         OverlayScrollBarInfo()
             : lastValue(-1),
               lastMinimum(-1),
               lastMaximum(-1),
-              lastUpdate(QDateTime::currentDateTime()),
+              lastUpdate(QDateTime::currentMSecsSinceEpoch()),
               hovered(false),
-              lastHovered(QDateTime::fromTime_t(0)),
-              cleared(false)
+              lastHovered(0),
+              cleared(false),
+              animating(false)
         {}
         int lastValue;
         int lastMinimum;
         int lastMaximum;
         QSize lastSize;
-        QDateTime lastUpdate;
+        qint64 lastUpdate;
         bool hovered;
-        QDateTime lastHovered;
+        qint64 lastHovered;
         bool cleared;
+        bool animating;
     };
-    QMap<const QWidget*, OverlayScrollBarInfo> scrollBarInfos;
+    mutable QMap<const QWidget*, OverlayScrollBarInfo> scrollBarInfos;
 
     struct ButtonState {
         int frame;
         enum { ButtonDark, ButtonLight } dir;
     } buttonState;
-    UInt8 progressFrame;
-    QPointer<QFocusFrame> focusWidget;
+    mutable QPointer<QFocusFrame> focusWidget;
     CFAbsoluteTime defaultButtonStart;
-    QMacStyle *q;
     bool mouseDown;
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
     void* receiver;

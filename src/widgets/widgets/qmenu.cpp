@@ -69,7 +69,6 @@
 #include "qpushbutton.h"
 #include <private/qpushbutton_p.h>
 #include <private/qaction_p.h>
-#include <private/qsoftkeymanager_p.h>
 #include <private/qguiapplication_p.h>
 
 QT_BEGIN_NAMESPACE
@@ -158,15 +157,6 @@ void QMenuPrivate::init()
         QObject::connect(platformMenu, SIGNAL(aboutToShow()), q, SIGNAL(aboutToShow()));
         QObject::connect(platformMenu, SIGNAL(aboutToHide()), q, SIGNAL(aboutToHide()));
     }
-
-#ifdef QT_SOFTKEYS_ENABLED
-    selectAction = QSoftKeyManager::createKeyedAction(QSoftKeyManager::SelectSoftKey, Qt::Key_Select, q);
-    cancelAction = QSoftKeyManager::createKeyedAction(QSoftKeyManager::CancelSoftKey, Qt::Key_Back, q);
-    selectAction->setPriority(QAction::HighPriority);
-    cancelAction->setPriority(QAction::HighPriority);
-    q->addAction(selectAction);
-    q->addAction(cancelAction);
-#endif
 }
 
 int QMenuPrivate::scrollerHeight() const
@@ -1674,12 +1664,6 @@ void QMenu::clear()
     QList<QAction*> acts = actions();
 
     for(int i = 0; i < acts.size(); i++) {
-#ifdef QT_SOFTKEYS_ENABLED
-        Q_D(QMenu);
-        // Lets not touch to our internal softkey actions
-        if(acts[i] == d->selectAction || acts[i] == d->cancelAction)
-            continue;
-#endif
         removeAction(acts[i]);
         if (acts[i]->parent() == this && acts[i]->d_func()->widgets.isEmpty())
             delete acts[i];
@@ -1765,6 +1749,8 @@ void QMenu::popup(const QPoint &p, QAction *atAction)
 {
     Q_D(QMenu);
     if (d->scroll) { // reset scroll state from last popup
+        if (d->scroll->scrollOffset)
+            d->itemsDirty = 1; // sizeHint will be incorrect if there is previous scroll
         d->scroll->scrollOffset = 0;
         d->scroll->scrollFlags = QMenuPrivate::QMenuScroller::ScrollNone;
     }
@@ -1862,6 +1848,7 @@ void QMenu::popup(const QPoint &p, QAction *atAction)
     d->mousePopupPos = mouse;
     const bool snapToMouse = (QRect(p.x() - 3, p.y() - 3, 6, 6).contains(mouse));
 
+    const QSize menuSize(sizeHint());
     if (adjustToDesktop) {
         // handle popup falling "off screen"
         if (isRightToLeft()) {
@@ -1895,7 +1882,7 @@ void QMenu::popup(const QPoint &p, QAction *atAction)
 
         if (pos.y() < screen.top() + desktopFrame)
             pos.setY(screen.top() + desktopFrame);
-        if (pos.y() + size.height() - 1 > screen.bottom() - desktopFrame) {
+        if (pos.y() + menuSize.height() - 1 > screen.bottom() - desktopFrame) {
             if (d->scroll) {
                 d->scroll->scrollFlags |= uint(QMenuPrivate::QMenuScroller::ScrollDown);
                 int y = qMax(screen.y(),pos.y());
@@ -1907,7 +1894,6 @@ void QMenu::popup(const QPoint &p, QAction *atAction)
         }
     }
     const int subMenuOffset = style()->pixelMetric(QStyle::PM_SubMenuOverlap, 0, this);
-    const QSize menuSize(sizeHint());
     QMenu *caused = qobject_cast<QMenu*>(d_func()->causedPopup.widget);
     if (caused && caused->geometry().width() + menuSize.width() + subMenuOffset < screen.width()) {
         QRect parentActionRect(caused->d_func()->actionRect(caused->d_func()->currentAction));
@@ -2380,13 +2366,6 @@ QMenu::event(QEvent *e)
                 e->accept();
         }
         return true;
-#endif
-#ifdef QT_SOFTKEYS_ENABLED
-    case QEvent::LanguageChange: {
-        d->selectAction->setText(QSoftKeyManager::standardSoftKeyText(QSoftKeyManager::SelectSoftKey));
-        d->cancelAction->setText(QSoftKeyManager::standardSoftKeyText(QSoftKeyManager::CancelSoftKey));
-        }
-        break;
 #endif
     default:
         break;

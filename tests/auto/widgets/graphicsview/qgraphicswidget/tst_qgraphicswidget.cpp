@@ -47,12 +47,15 @@
 #include <qgraphicsview.h>
 #include <qstyleoption.h>
 #include <qgraphicslinearlayout.h>
-#include <qcleanlooksstyle.h>
 #include <qlineedit.h>
 #include <qboxlayout.h>
 #include <qaction.h>
 #include <qwidgetaction.h>
+#ifndef Q_NO_STYLE_FUSION
+#include <qfusionstyle.h>
+#endif
 
+#include "../../../qtest-config.h"
 
 class EventSpy : public QObject
 {
@@ -1396,21 +1399,22 @@ void tst_QGraphicsWidget::setStyle_data()
 {
     QTest::addColumn<QString>("style");
     QTest::newRow("null") << "";
-    QTest::newRow("cleanlooks") << "QCleanlooksStyle";
+    QTest::newRow("fusion") << "QFusionStyle";
 }
 
 // void setStyle(QStyle* style) public
 void tst_QGraphicsWidget::setStyle()
 {
+#ifndef Q_NO_STYLE_FUSION
     SubQGraphicsWidget widget;
-    QCleanlooksStyle cleanlooksStyle;
+    QFusionStyle fusionStyle;
 
     int oldEventCounts = widget.eventCount;
 
     QFETCH(QString, style);
-    if (style == "QCleanlooksStyle") {
-        widget.setStyle(&cleanlooksStyle);
-        QCOMPARE(widget.style(), static_cast<QStyle*>(&cleanlooksStyle));
+    if (style == "QFusionStyle") {
+        widget.setStyle(&fusionStyle);
+        QCOMPARE(widget.style(), static_cast<QStyle*>(&fusionStyle));
     } else {
         widget.setStyle(0);
         QVERIFY(widget.style() != (QStyle *)0);
@@ -1420,6 +1424,7 @@ void tst_QGraphicsWidget::setStyle()
 
     // cleanup
     widget.setStyle(0);
+#endif
 }
 
 void tst_QGraphicsWidget::setTabOrder_data()
@@ -3203,10 +3208,12 @@ void tst_QGraphicsWidget::itemChangeEvents()
                 valueDuringEvents.insert(QEvent::ParentChange, QVariant::fromValue(parentItem()));
                 break;
             }
+#ifndef QTEST_NO_CURSOR
             case QEvent::CursorChange: {
                 valueDuringEvents.insert(QEvent::CursorChange, int(cursor().shape()));
                 break;
             }
+#endif
             case QEvent::ToolTipChange: {
                 valueDuringEvents.insert(QEvent::ToolTipChange, toolTip());
                 break;
@@ -3252,9 +3259,11 @@ void tst_QGraphicsWidget::itemChangeEvents()
     QVERIFY(!item->isVisible());
     QTRY_VERIFY(!item->valueDuringEvents.value(QEvent::Hide).toBool());
 
+#ifndef QTEST_NO_CURSOR
     // CursorChange should be triggered after the cursor has changed
     item->setCursor(Qt::PointingHandCursor);
     QTRY_COMPARE(item->valueDuringEvents.value(QEvent::CursorChange).toInt(), int(item->cursor().shape()));
+#endif
 
     // ToolTipChange should be triggered after the tooltip has changed
     item->setToolTip("tooltipText");

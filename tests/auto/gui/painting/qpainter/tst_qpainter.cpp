@@ -279,6 +279,7 @@ private slots:
 
     void drawTextWithComplexBrush();
     void QTBUG26013_squareCapStroke();
+    void QTBUG25153_drawLine();
 
 private:
     void fillData();
@@ -829,6 +830,7 @@ void tst_QPainter::drawLine()
     { // unclipped
         pixmapUnclipped.fill(Qt::white);
         QPainter p(&pixmapUnclipped);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.translate(offset, offset);
         p.setPen(QPen(Qt::black));
         p.drawLine(line);
@@ -855,6 +857,7 @@ void tst_QPainter::drawLine()
 
         pixmapClipped.fill(Qt::white);
         QPainter p(&pixmapClipped);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.translate(offset, offset);
         p.setClipRect(clip);
         p.setPen(QPen(Qt::black));
@@ -891,6 +894,7 @@ void tst_QPainter::drawLine_task121143()
     image.fill(0xffffffff);
     QPainter p(&image);
     p.setPen(pen);
+    p.setRenderHint(QPainter::Qt4CompatiblePainting);
     p.drawLine(QLine(0, 0+4, 0+4, 0));
     p.end();
 
@@ -1027,6 +1031,7 @@ void tst_QPainter::drawRect2()
         QTransform transform(0.368567, 0, 0, 0, 0.368567, 0, 0.0289, 0.0289, 1);
 
         QPainter p(&image);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.setTransform(transform);
         p.setBrush(Qt::red);
         p.setPen(Qt::NoPen);
@@ -1037,6 +1042,7 @@ void tst_QPainter::drawRect2()
         image.fill(0xffffffff);
 
         p.begin(&image);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.setTransform(transform);
         p.drawRect(QRect(14, 14, 39, 39));
         p.end();
@@ -1183,6 +1189,7 @@ void tst_QPainter::drawPath()
     image.fill(QColor(Qt::white).rgb());
 
     QPainter p(&image);
+    p.setRenderHint(QPainter::Qt4CompatiblePainting);
     p.setPen(Qt::NoPen);
     p.setBrush(Qt::black);
     p.translate(offset - expectedBounds.left(), offset - expectedBounds.top());
@@ -1245,11 +1252,7 @@ void tst_QPainter::drawPath2()
 
 void tst_QPainter::drawPath3()
 {
-#if !defined(Q_OS_WINCE)
-    QImage imgA(400, 400, QImage::Format_RGB32);
-#else
     QImage imgA(100, 100, QImage::Format_RGB32);
-#endif
     imgA.fill(0xffffff);
     QImage imgB = imgA;
 
@@ -1412,6 +1415,7 @@ void tst_QPainter::drawRoundRect()
     {
         pixmap.fill(Qt::white);
         QPainter p(&pixmap);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.setPen(usePen ? QPen(Qt::black) : QPen(Qt::NoPen));
         p.setBrush(Qt::black);
         p.drawRoundRect(rect);
@@ -1486,6 +1490,7 @@ void tst_QPainter::setWindow()
     pixmap.fill(QColor(Qt::white));
 
     QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Qt4CompatiblePainting);
     painter.setWindow(0, 0, 3, 3);
     painter.drawLine(1, 1, 2, 2);
 
@@ -4184,6 +4189,7 @@ void tst_QPainter::drawText_subPixelPositionsInRaster_qtbug5053()
     baseLine.fill(Qt::white);
     {
         QPainter p(&baseLine);
+        p.setRenderHint(QPainter::Qt4CompatiblePainting);
         p.drawText(0, fm.ascent(), QString::fromLatin1("e"));
     }
 
@@ -4194,6 +4200,7 @@ void tst_QPainter::drawText_subPixelPositionsInRaster_qtbug5053()
 
         {
             QPainter p(&comparison);
+            p.setRenderHint(QPainter::Qt4CompatiblePainting);
             p.drawText(QPointF(i / 12.0, fm.ascent()), QString::fromLatin1("e"));
         }
 
@@ -4385,6 +4392,26 @@ void tst_QPainter::QTBUG26013_squareCapStroke()
 
         // ensure that a vertical line and a horizontal line with square cap round up (to the right) at the same time
         QCOMPARE(image.pixel(0, 0), image.pixel(0, 1));
+    }
+}
+
+void tst_QPainter::QTBUG25153_drawLine()
+{
+    QImage image(2, 2, QImage::Format_RGB32);
+
+    QVector<Qt::PenCapStyle> styles;
+    styles << Qt::FlatCap << Qt::SquareCap << Qt::RoundCap;
+
+    foreach (Qt::PenCapStyle style, styles) {
+        image.fill(0xffffffff);
+        QPainter p(&image);
+        p.setPen(QPen(Qt::black, 0, Qt::SolidLine, style));
+        p.drawLine(QLineF(0, 0, 0, 0));
+        p.end();
+
+        QCOMPARE(image.pixel(0, 0), 0xff000000);
+        QCOMPARE(image.pixel(0, 1), 0xffffffff);
+        QCOMPARE(image.pixel(1, 0), 0xffffffff);
     }
 }
 

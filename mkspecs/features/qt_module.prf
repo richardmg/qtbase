@@ -32,19 +32,7 @@ else: \
     MODULE_DEFINE = QT_$${ucmodule}_LIB
 MODULE_DEFINES = $$MODULE_DEFINE $$MODULE_DEFINES
 
-# Find the module's source root dir.
-MODULE_PROFILE_DIR = $$_PRO_FILE_PWD_
-for(ever) {
-    exists($$MODULE_PROFILE_DIR/sync.profile):break()
-    nmpri = $$dirname(MODULE_PROFILE_DIR)
-    equals(nmpri, $$MODULE_PROFILE_DIR):error("No sync.profile found. This does not look like a Qt module source tree.")
-    MODULE_PROFILE_DIR = $$nmpri
-    unset(nmpri)
-}
-
-isEmpty(MODULE_BASE_DIR): MODULE_BASE_DIR = $$MODULE_PROFILE_DIR
-isEmpty(MODULE_BASE_OUTDIR): MODULE_BASE_OUTDIR = $$shadowed($$MODULE_BASE_DIR)
-isEmpty(MODULE_QMAKE_OUTDIR): MODULE_QMAKE_OUTDIR = $$MODULE_BASE_OUTDIR
+load(qt_build_paths)
 
 # This check will be removed soon. Weird indentation to avoid reindenting the code later.
 !isEmpty(MODULE_PRI) {
@@ -53,7 +41,7 @@ isEmpty(MODULE_QMAKE_OUTDIR): MODULE_QMAKE_OUTDIR = $$MODULE_BASE_OUTDIR
     exists($$MODULE_PRI)|error("Specified module pri file $$MODULE_PRI does not exist.")
 } else {
 
-MODULE_PRI = $$MODULE_QMAKE_OUTDIR/mkspecs/modules-inst/qt_$${MODULE}.pri
+MODULE_PRI = $$MODULE_QMAKE_OUTDIR/mkspecs/modules-inst/qt_lib_$${MODULE}.pri
 
 !build_pass {
 
@@ -119,6 +107,17 @@ win32:!wince*:exists($$[QT_INSTALL_PREFIX]/.qmake.cache): DLLDESTDIR = $$eval(QT
 CONFIG          += qt warn_on depend_includepath
 CONFIG          += qmake_cache target_qt
 CONFIG          -= fix_output_dirs
+
+!isEmpty(QMAKE_DOCS) {
+    doc_subdir = doc
+
+    unset(QMAKE_DOCS_INDEX)
+    QMAKE_DOCS_OUTPUTDIR = $$MODULE_BASE_OUTDIR/$$doc_subdir/qt$${MODULE}
+    for(qmod, QMAKEMODULES): \
+        QMAKE_DOCS_INDEX += $$section(qmod, /, 0, -3)/$$doc_subdir
+
+    CONFIG += qt_install_module_docs
+}
 
 # If Qt was configured with -debug-and-release then build the module the same way
 if(win32|mac):!macx-xcode {

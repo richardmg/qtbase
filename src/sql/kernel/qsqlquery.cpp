@@ -399,9 +399,27 @@ bool QSqlQuery::exec(const QString& query)
 
 QVariant QSqlQuery::value(int index) const
 {
-    if (isActive() && isValid() && (index > QSql::BeforeFirstRow))
+    if (isActive() && isValid() && (index > -1))
         return d->sqlResult->data(index);
     qWarning("QSqlQuery::value: not positioned on a valid record");
+    return QVariant();
+}
+
+/*!
+    \overload
+
+    Returns the value of the field called \a name in the current record.
+    If field \a name does not exist an invalid variant is returned.
+
+    This overload is less efficient than \l{QSqlQuery::}{value()}
+*/
+
+QVariant QSqlQuery::value(const QString& name) const
+{
+    int index = d->sqlResult->record().indexOf(name);
+    if (index > -1)
+        return value(index);
+    qWarning("QSqlQuery::value: unknown field name '%s'", qPrintable(name));
     return QVariant();
 }
 

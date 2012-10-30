@@ -67,7 +67,7 @@ struct bpsIOHandlerData {
     fd_set *exceptfds;
 };
 
-static int bpsIOReadyDomain = -1;
+static int bpsUnblockDomain = -1;
 
 static int bpsIOHandler(int fd, int io_events, void *data)
 {
@@ -103,13 +103,13 @@ static int bpsIOHandler(int fd, int io_events, void *data)
         qEventDispatcherDebug << "Sending bpsIOReadyDomain event";
         // create IO ready event
         bps_event_t *event;
-        int result = bps_event_create(&event, bpsIOReadyDomain, 0, NULL, NULL);
+        int result = bps_event_create(&event, bpsUnblockDomain, 0, NULL, NULL);
         if (result != BPS_SUCCESS) {
             qWarning("QEventDispatcherBlackberryPrivate::QEventDispatcherBlackberry: bps_event_create() failed");
             return BPS_FAILURE;
         }
 
-        // post IO ready event to our thread
+        // post unblock event to our thread
         result = bps_push_event(event);
         if (result != BPS_SUCCESS) {
             qWarning("QEventDispatcherBlackberryPrivate::QEventDispatcherBlackberry: bps_push_event() failed");
@@ -129,27 +129,31 @@ QEventDispatcherBlackberryPrivate::QEventDispatcherBlackberryPrivate()
     if (result != BPS_SUCCESS)
         qFatal("QEventDispatcherBlackberryPrivate::QEventDispatcherBlackberry: bps_initialize() failed");
 
-    // get domain for IO ready events - ignoring race condition here for now
-    if (bpsIOReadyDomain == -1) {
-        bpsIOReadyDomain = bps_register_domain();
-        if (bpsIOReadyDomain == -1)
+    bps_channel = bps_channel_get_active();
+
+    // get domain for IO ready and wake up events - ignoring race condition here for now
+    if (bpsUnblockDomain == -1) {
+        bpsUnblockDomain = bps_register_domain();
+        if (bpsUnblockDomain == -1)
             qWarning("QEventDispatcherBlackberryPrivate::QEventDispatcherBlackberry: bps_register_domain() failed");
     }
-
-    // \TODO Reinstate this when bps is fixed. See comment in select() below.
-    // Register thread_pipe[0] with bps
-    /*
-    int io_events = BPS_IO_INPUT;
-    result = bps_add_fd(thread_pipe[0], io_events, &bpsIOHandler, ioData.data());
-    if (result != BPS_SUCCESS)
-        qWarning() << Q_FUNC_INFO << "bps_add_fd() failed";
-    */
 }
 
 QEventDispatcherBlackberryPrivate::~QEventDispatcherBlackberryPrivate()
 {
     // we're done using BPS
     bps_shutdown();
+}
+
+int QEventDispatcherBlackberryPrivate::initThreadWakeUp()
+{
+    return -1;  // no fd's used
+}
+
+int QEventDispatcherBlackberryPrivate::processThreadWakeUp(int nsel)
+{
+    Q_UNUSED(nsel);
+    return wakeUps.fetchAndStoreRelaxed(0);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -246,28 +250,15 @@ int QEventDispatcherBlackberry::select(int nfds, fd_set *readfds, fd_set *writef
 {
     Q_UNUSED(nfds);
 
+    // Make a note of the start time
+    timeval startTime = qt_gettime();
+
     // prepare file sets for bps callback
     Q_D(QEventDispatcherBlackberry);
     d->ioData->count = 0;
     d->ioData->readfds = readfds;
     d->ioData->writefds = writefds;
     d->ioData->exceptfds = exceptfds;
-
-    // \TODO Remove this when bps is fixed
-    //
-    // Work around a bug in BPS with which if we register the thread_pipe[0] fd with bps in the
-    // private class' ctor once only then we get spurious notifications that thread_pipe[0] is
-    // ready for reading. The first time the notification is correct and the pipe is emptied in
-    // the calling doSelect() function. The 2nd notification is an error and the resulting attempt
-    // to read and call to wakeUps.testAndSetRelease(1, 0) fails as there has been no intervening
-    // call to QEventDispatcherUNIX::wakeUp().
-    //
-    // Registering thread_pipe[0] here and unregistering it at the end of this call works around
-    // this issue.
-    int io_events = BPS_IO_INPUT;
-    int result = bps_add_fd(d->thread_pipe[0], io_events, &bpsIOHandler, d->ioData.data());
-    if (result != BPS_SUCCESS)
-        qWarning() << Q_FUNC_INFO << "bps_add_fd() failed";
 
     // reset all file sets
     if (readfds)
@@ -279,44 +270,90 @@ int QEventDispatcherBlackberry::select(int nfds, fd_set *readfds, fd_set *writef
     if (exceptfds)
         FD_ZERO(exceptfds);
 
-    // convert timeout to milliseconds
-    int timeout_ms = -1;
+    // Convert timeout to milliseconds
+    int timeoutTotal = -1;
     if (timeout)
-        timeout_ms = (timeout->tv_sec * 1000) + (timeout->tv_usec / 1000);
+        timeoutTotal = (timeout->tv_sec * 1000) + (timeout->tv_usec / 1000);
 
-    QElapsedTimer timer;
-    timer.start();
+    int timeoutLeft = timeoutTotal;
 
-    do {
-        // wait for event or file to be ready
-        bps_event_t *event = NULL;
+    bps_event_t *event = 0;
+    unsigned int eventCount = 0;
 
-        // \TODO Remove this when bps is fixed
-        // BPS has problems respecting timeouts.
-        // Replace the bps_get_event statement
-        // with the following commented version
-        // once bps is fixed.
-        // result = bps_get_event(&event, timeout_ms);
-        result = bps_get_event(&event, 0);
+    // This loop exists such that we can drain the bps event queue of all native events
+    // more efficiently than if we were to return control to Qt after each event. This
+    // is important for handling touch events which can come in rapidly.
+    forever {
+        // Only emit the awake() and aboutToBlock() signals in the second iteration. For the
+        // first iteration, the UNIX event dispatcher will have taken care of that already.
+        // Also native events are actually processed one loop iteration after they were
+        // retrieved with bps_get_event().
 
+        // Filtering the native event should happen between the awake() and aboutToBlock()
+        // signal emissions. The calls awake() - filterNativeEvent() - aboutToBlock() -
+        // bps_get_event() need not to be interrupted by a break or return statement.
+        if (eventCount > 0) {
+            if (event) {
+                emit awake();
+                filterNativeEvent(QByteArrayLiteral("bps_event_t"), static_cast<void*>(event), 0);
+                emit aboutToBlock();
+            }
+
+            // Update the timeout
+            // Clock source is monotonic, so we can recalculate how much timeout is left
+            if (timeoutTotal != -1) {
+                timeval t2 = qt_gettime();
+                timeoutLeft = timeoutTotal - ((t2.tv_sec * 1000 + t2.tv_usec / 1000)
+                                              - (startTime.tv_sec * 1000 + startTime.tv_usec / 1000));
+                if (timeoutLeft < 0)
+                    timeoutLeft = 0;
+            }
+        }
+
+        // Wait for event or file to be ready
+        event = 0;
+        const int result = bps_get_event(&event, timeoutLeft);
         if (result != BPS_SUCCESS)
             qWarning("QEventDispatcherBlackberry::select: bps_get_event() failed");
 
-        if (!event)
+        if (!event)    // In case of !event, we break out of the loop to let Qt process the timers
+            break;     // (since timeout has expired) and socket notifiers that are now ready.
+
+        if (bps_event_get_domain(event) == bpsUnblockDomain) {
+            timeoutTotal = 0;   // in order to immediately drain the event queue of native events
+            event = 0;          // (especially touch move events) we don't break out here
+        }
+
+        ++eventCount;
+
+        // Make sure we are not trapped in this loop due to continuous native events
+        // also we cannot recalculate the timeout without a monotonic clock as the time may have changed
+        const unsigned int maximumEventCount = 12;
+        if (Q_UNLIKELY((eventCount > maximumEventCount && timeoutLeft == 0)
+                       || !QElapsedTimer::isMonotonic())) {
+            if (event)
+                filterNativeEvent(QByteArrayLiteral("bps_event_t"), static_cast<void*>(event), 0);
             break;
-
-        // pass all received events through filter - except IO ready events
-        if (event && bps_event_get_domain(event) != bpsIOReadyDomain)
-            filterNativeEvent(QByteArrayLiteral("bps_event_t"), static_cast<void*>(event), 0);
-    } while (timer.elapsed() < timeout_ms);
-
-    // \TODO Remove this when bps is fixed (see comment above)
-    result = bps_remove_fd(d->thread_pipe[0]);
-    if (result != BPS_SUCCESS)
-        qWarning() << Q_FUNC_INFO << "bps_remove_fd() failed";
+        }
+    }
 
     // the number of bits set in the file sets
     return d->ioData->count;
+}
+
+void QEventDispatcherBlackberry::wakeUp()
+{
+    Q_D(QEventDispatcherBlackberry);
+    if (d->wakeUps.testAndSetAcquire(0, 1)) {
+        bps_event_t *event;
+        if (bps_event_create(&event, bpsUnblockDomain, 0, 0, 0) == BPS_SUCCESS) {
+            if (bps_channel_push_event(d->bps_channel, event) == BPS_SUCCESS)
+                return;
+            else
+                bps_event_destroy(event);
+        }
+        qWarning("QEventDispatcherBlackberryPrivate::wakeUp failed");
+    }
 }
 
 int QEventDispatcherBlackberry::ioEvents(int fd)

@@ -63,7 +63,7 @@
 #include <QtWidgets/QFileDialog>
 
 #include <QtWidgets/QGtkStyle>
-#include <private/qwindowsstyle_p.h>
+#include <private/qcommonstyle_p.h>
 
 #undef signals // Collides with GTK symbols
 #include <gtk/gtk.h>
@@ -181,6 +181,7 @@ typedef void (*Ptr_gtk_range_set_inverted)(GtkRange*, bool);
 typedef void (*Ptr_gtk_container_add)(GtkContainer *container, GtkWidget *widget);
 typedef GtkIconSet* (*Ptr_gtk_icon_factory_lookup_default) (const gchar*);
 typedef GtkIconTheme* (*Ptr_gtk_icon_theme_get_default) (void);
+typedef GtkStyle* (*Ptr_gtk_widget_get_style)(GtkWidget *);
 typedef void (*Ptr_gtk_widget_style_get)(GtkWidget *, const gchar *first_property_name, ...);
 typedef GtkTreeViewColumn* (*Ptr_gtk_tree_view_column_new)(void);
 typedef GtkWidget* (*Ptr_gtk_fixed_new)(void);
@@ -215,6 +216,8 @@ typedef void (*Ptr_gtk_menu_shell_append)(GtkMenuShell *, GtkWidget *);
 typedef GtkType (*Ptr_gtk_container_get_type) (void);
 typedef GtkType (*Ptr_gtk_window_get_type) (void);
 typedef GtkType (*Ptr_gtk_widget_get_type) (void);
+typedef GtkWidget* (*Ptr_gtk_widget_get_parent) (GtkWidget *);
+typedef gboolean (*Ptr_gtk_widget_is_toplevel) (GtkWidget *);
 typedef GtkStyle* (*Ptr_gtk_rc_get_style_by_paths) (GtkSettings *, const char *, const char *, GType);
 typedef gint (*Ptr_pango_font_description_get_size) (const PangoFontDescription *);
 typedef PangoWeight (*Ptr_pango_font_description_get_weight) (const PangoFontDescription *);
@@ -238,6 +241,8 @@ typedef void (*Ptr_gtk_file_chooser_set_current_name) (GtkFileChooser *, const g
 typedef gboolean (*Ptr_gtk_file_chooser_set_filename) (GtkFileChooser *chooser, const gchar *name);
 typedef gint (*Ptr_gtk_dialog_run) (GtkDialog*);
 typedef void (*Ptr_gtk_border_free)(GtkBorder *);
+typedef void (*Ptr_gtk_widget_get_allocation) (GtkWidget*, GtkAllocation*);
+typedef void (*Ptr_gtk_widget_set_allocation) (GtkWidget*, const GtkAllocation*);
 
 typedef guchar* (*Ptr_gdk_pixbuf_get_pixels) (const GdkPixbuf *pixbuf);
 typedef int (*Ptr_gdk_pixbuf_get_width) (const GdkPixbuf *pixbuf);
@@ -254,7 +259,6 @@ typedef void (*Ptr_gdk_draw_rectangle) (GdkDrawable *drawable, GdkGC *gc,
                                         gboolean filled, gint x, gint y, gint width, gint height);
 typedef void (*Ptr_gdk_pixbuf_unref)(GdkPixbuf *);
 typedef void (*Ptr_gdk_drawable_unref)(GdkDrawable *);
-typedef gint (*Ptr_gdk_drawable_get_depth)(GdkDrawable *);
 typedef void (*Ptr_gdk_x11_window_set_user_time) (GdkWindow *window, guint32);
 typedef XID  (*Ptr_gdk_x11_drawable_get_xid) (GdkDrawable *);
 typedef Display* (*Ptr_gdk_x11_drawable_get_xdisplay) ( GdkDrawable *);
@@ -313,7 +317,7 @@ typedef char* (*Ptr_gnome_icon_lookup_sync)  (
         GnomeIconLookupFlags flags,
         GnomeIconLookupResultFlags *result);
 
-class QGtkStylePrivate : public QWindowsStylePrivate
+class QGtkStylePrivate : public QCommonStylePrivate
 {
     Q_DECLARE_PUBLIC(QGtkStyle)
 public:
@@ -405,6 +409,7 @@ public:
     static Ptr_gtk_range_set_inverted gtk_range_set_inverted;
     static Ptr_gtk_icon_factory_lookup_default gtk_icon_factory_lookup_default;
     static Ptr_gtk_icon_theme_get_default gtk_icon_theme_get_default;
+    static Ptr_gtk_widget_get_style gtk_widget_get_style;
     static Ptr_gtk_widget_style_get gtk_widget_style_get;
     static Ptr_gtk_icon_set_render_icon gtk_icon_set_render_icon;
     static Ptr_gtk_fixed_new gtk_fixed_new;
@@ -437,9 +442,13 @@ public:
     static Ptr_gtk_container_get_type gtk_container_get_type;
     static Ptr_gtk_window_get_type gtk_window_get_type;
     static Ptr_gtk_widget_get_type gtk_widget_get_type;
+    static Ptr_gtk_widget_get_parent gtk_widget_get_parent;
+    static Ptr_gtk_widget_is_toplevel gtk_widget_is_toplevel;
     static Ptr_gtk_rc_get_style_by_paths gtk_rc_get_style_by_paths;
     static Ptr_gtk_check_version gtk_check_version;
     static Ptr_gtk_border_free gtk_border_free;
+    static Ptr_gtk_widget_get_allocation gtk_widget_get_allocation;
+    static Ptr_gtk_widget_set_allocation gtk_widget_set_allocation;
 
     static Ptr_pango_font_description_get_size pango_font_description_get_size;
     static Ptr_pango_font_description_get_weight pango_font_description_get_weight;
@@ -469,7 +478,6 @@ public:
     static Ptr_gdk_draw_rectangle gdk_draw_rectangle;
     static Ptr_gdk_pixbuf_unref gdk_pixbuf_unref;
     static Ptr_gdk_drawable_unref gdk_drawable_unref;
-    static Ptr_gdk_drawable_get_depth gdk_drawable_get_depth;
     static Ptr_gdk_color_free gdk_color_free;
     static Ptr_gdk_x11_window_set_user_time gdk_x11_window_set_user_time;
     static Ptr_gdk_x11_drawable_get_xid gdk_x11_drawable_get_xid;
@@ -513,6 +521,15 @@ protected:
     static void removeWidgetFromMap(const QHashableLatin1Literal &path);
 
     virtual void init();
+
+    enum {
+        menuItemFrame        =  2, // menu item frame width
+        menuItemHMargin      =  3, // menu item hor text margin
+        menuArrowHMargin     =  6, // menu arrow horizontal margin
+        menuItemVMargin      =  2, // menu item ver text margin
+        menuRightBorder      = 15, // right border on menus
+        menuCheckMarkWidth   = 12  // checkmarks width on menus
+    };
 
 private:
     static QList<QGtkStylePrivate *> instances;

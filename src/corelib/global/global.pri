@@ -9,6 +9,7 @@ HEADERS +=  \
         global/qendian.h \
         global/qnumeric_p.h \
         global/qnumeric.h \
+        global/qlibraryinfo.h \
         global/qlogging.h \
         global/qtypeinfo.h \
         global/qsysinfo.h \
@@ -35,3 +36,7 @@ linux*:!cross_compile:!static:!*-armcc* {
    DEFINES += ELF_INTERPRETER=\\\"$$system(readelf -l /bin/ls | perl -n -e \'$$prog\')\\\"
 }
 
+slog2 {
+    LIBS_PRIVATE += -lslog2
+    DEFINES += QT_USE_SLOG2
+}

@@ -1408,6 +1408,7 @@ bool QGraphicsWidget::event(QEvent *event)
         break;
     case QEvent::WindowActivate:
     case QEvent::WindowDeactivate:
+    case QEvent::StyleAnimationUpdate:
         update();
         break;
         // Taken from QWidget::event
@@ -2298,7 +2299,6 @@ void QGraphicsWidget::paintWindowFrame(QPainter *painter, const QStyleOptionGrap
             painter->fillRect(windowFrameRect, palette().window());
         }
     }
-    painter->setRenderHint(QPainter::NonCosmeticDefaultPen);
 
     // Draw title
     int height = (int)d->titleBarHeight(bar);

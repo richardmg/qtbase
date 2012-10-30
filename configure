@@ -224,28 +224,28 @@ getXQMakeConf()
     getQMakeConf3 "$1" "$xspecvals"
 }
 
-# relies on $TEST_COMPILER being set correctly
 compilerSupportsFlag()
 {
     cat >conftest.cpp <<EOF
 int main() { return 0; }
 EOF
-    $TEST_COMPILER "$@" -o conftest-out.o conftest.cpp
+    "$@" -o conftest-out.o conftest.cpp
     ret=$?
     rm -f conftest.cpp conftest-out.o
     return $ret
 }
 
-# relies on $TEST_COMPILER being set correctly
 linkerSupportsFlag()
 {
+    compiler=$1
+    shift
     lflags=-Wl
     for flag
     do
 	safe_flag=`shellEscape "$flag"`
 	lflags=$lflags,$safe_flag
     done
-    compilerSupportsFlag "$lflags" >/dev/null 2>&1
+    compilerSupportsFlag $compiler $lflags >/dev/null 2>&1
 }
 
 # $1: newline-separated list of default paths
@@ -727,7 +727,7 @@ mkdir -p "$outpath/config.tests"
 rm -f "$outpath/config.tests/.qmake.cache"
 cp "$QMAKE_VARS_FILE" "$outpath/config.tests/.qmake.cache"
 
-QMakeVar add styles "cde mac motif plastique cleanlooks windows"
+QMakeVar add styles "mac fusion windows"
 
 # QTDIR may be set and point to an old or system-wide Qt installation
 unset QTDIR
@@ -784,6 +784,8 @@ CFG_QML_DEBUG=yes
 CFG_JAVASCRIPTCORE_JIT=auto
 CFG_PKGCONFIG=auto
 CFG_STACK_PROTECTOR_STRONG=auto
+CFG_SLOG2=auto
+CFG_SYSTEM_PROXIES=no
 
 # Target architecture
 CFG_ARCH=
@@ -800,6 +802,7 @@ CFG_XINPUT2=auto
 CFG_XINPUT=runtime
 CFG_XKB=auto
 CFG_XCB=auto
+CFG_XCB_GLX=no
 CFG_XCB_LIMITED=yes
 CFG_EGLFS=auto
 CFG_DIRECTFB=auto
@@ -1000,6 +1003,14 @@ while [ "$#" -gt 0 ]; do
     -enable-*|-disable-*)
         VAR=`echo $1 | sed "s,^-\([^-]*\)-.*,\1,"`
         VAL=`echo $1 | sed "s,^-[^-]*-\(.*\),\1,"`
+        ;;
+    -system-proxies)
+        VAR=system-proxies
+        VAL=yes
+        ;;
+    -no-system-proxies)
+        VAR=system-proxies
+        VAL=no
         ;;
     #Qt Builtin/System style options
     -no-*|-system-*|-qt-*)
@@ -1784,6 +1795,13 @@ while [ "$#" -gt 0 ]; do
             UNKNOWN_OPT=yes
         fi
         ;;
+    slog2)
+        if [ "$VAL" = "yes" ] || [ "$VAL" = "no" ]; then
+            CFG_SLOG2="$VAL"
+        else
+            UNKNOWN_OPT=yes
+        fi
+        ;;
     gstreamer)
         if [ "$VAL" = "yes" ] || [ "$VAL" = "no" ]; then
             CFG_GSTREAMER="$VAL"
@@ -2081,6 +2099,13 @@ while [ "$#" -gt 0 ]; do
             UNKNOWN_OPT=yes
         fi
         ;;
+    system-proxies)
+        if [ "$VAL" = "yes" ] || [ "$VAL" = "no" ]; then
+            CFG_SYSTEM_PROXIES="$VAL"
+        else
+            UNKNOWN_OPT=yes
+        fi
+        ;;
     *)
         UNKNOWN_OPT=yes
         ;;
@@ -2192,7 +2217,7 @@ if [ "$OPT_SHADOW" = "yes" ]; then
     if [ -x "$relpath/bin/syncqt" ]; then
         mkdir -p "$outpath/bin"
         echo "#!/bin/sh" >"$outpath/bin/syncqt"
-        echo "perl \"$relpath/bin/syncqt\" -qtdir \"$outpath\" \"\$@\"" >>"$outpath/bin/syncqt"
+        echo "perl \"$relpath/bin/syncqt\" -mkspecsdir \"$outpath/mkspecs\" \"\$@\"" >>"$outpath/bin/syncqt"
         chmod 755 "$outpath/bin/syncqt"
     fi
 
@@ -2246,9 +2271,9 @@ if [ "$OPT_SHADOW" = "yes" ]; then
         mv "$outpath/mkspecs-modules-inst" "$outpath/mkspecs/modules-inst"
     fi
 
-    # symlink the doc directory
-    rm -rf "$outpath/doc"
-    ln -s "$relpath/doc" "$outpath/doc"
+    # Prepare doc directory
+    mkdir -p "$outpath/doc"
+    ln -f -s "$relpath"/doc/global "$outpath/doc"
 fi
 
 # symlink fonts to be able to run application from build directory
@@ -2303,12 +2328,10 @@ if [ -z "$PLATFORM" ]; then
             PLATFORM=macx-clang
          elif [ "$OSX_VERSION" -eq 11 ]; then
              # We're on Lion. Check if we have a supported Clang version
-             case "$(clang -v 2>&1 | grep -Po '(?<=version )\d[\d.]+')" in
-                 3.*)
+             if [ "$(clang -v 2>&1 | grep -Po '(?<=version )[\d]')" -ge 3 ]; then
                      PLATFORM=macx-clang
                      PLATFORM_NOTES="\n    - Also available for Mac OS X: macx-g++\n"
-                     ;;
-             esac
+             fi
          fi
          ;;
      AIX:*)
@@ -2663,7 +2686,7 @@ fi
 
 # auto-detect -fstack-protector-strong support (for QNX only currently)
 if [ "$XPLATFORM_QNX" = "yes" ]; then
-    if compilerSupportsFlag -fstack-protector-strong; then
+    if compilerSupportsFlag $TEST_COMPILER -fstack-protector-strong; then
        CFG_STACK_PROTECTOR_STRONG=yes
     else
        CFG_STACK_PROTECTOR_STRONG=no
@@ -3275,11 +3298,6 @@ Additional options:
     -feature-<feature> .. Compile in <feature>. The available features
                           are described in src/corelib/global/qfeatures.txt
 
-    -no-freetype ........ Do not compile in Freetype2 support.
-    -qt-freetype ........ Use the libfreetype bundled with Qt.
- *  -system-freetype .... Use libfreetype from the operating system.
-                          See http://www.freetype.org/
-
     -qconfig local ...... Use src/corelib/global/qconfig-local.h rather than the
                           default ($CFG_QCONFIG).
 
@@ -3288,6 +3306,9 @@ Additional options:
                           With no parameter, this will attempt to auto-detect
                           OpenGL ES 2, or regular desktop OpenGL.
                           Use es2 for <api> to override auto-detection.
+
+ *  -no-system-proxies .. Do not use system network proxies by default.
+    -system-proxies ..... Use system network proxies by default.
 
  $GBN  -no-glib ........... Do not compile Glib support.
  $GBY  -glib .............. Compile Glib support.
@@ -3298,6 +3319,16 @@ if [ "$XPLATFORM_MAEMO" = "yes" ]; then
 
  $X2N  -no-xinput2......... Do not compile XInput2 support.
  $X2Y  -xinput2............ Compile XInput2 support.
+
+EOF
+
+fi
+
+if [ "$XPLATFORM_QNX" = "yes" ]; then
+    cat << EOF
+
+    -no-slog2 .......... Do not compile with slog2 support.
+    -slog2 ............. Compile with slog2 support.
 
 EOF
 
@@ -4009,6 +4040,18 @@ if [ "$CFG_ZLIB" = "no" ]; then
     CFG_ZLIB=auto
     ZLIB_FORCED=yes
 fi
+
+if [ "$XPLATFORM_QNX" = "yes" ]; then
+    if [ "$CFG_SLOG2" != "no" ]; then
+        if compileTest unix/slog2 "slog2"; then
+            CFG_SLOG2=yes
+            QMAKE_CONFIG="$QMAKE_CONFIG slog2"
+        else
+            CFG_SLOG2=no
+        fi
+    fi
+fi
+
 if [ "$CFG_ZLIB" = "auto" ]; then
     if compileTest unix/zlib "zlib"; then
        CFG_ZLIB=system
@@ -4446,7 +4489,7 @@ fi
 # auto-detect GTK style support
 if [ "$CFG_GLIB" = "yes" -a "$CFG_QGTKSTYLE" != "no" ]; then
     if [ -n "$PKG_CONFIG" ]; then
-        QT_CFLAGS_QGTKSTYLE=`$PKG_CONFIG --cflags gtk+-2.0 ">=" 2.10 atk 2>/dev/null`
+        QT_CFLAGS_QGTKSTYLE=`$PKG_CONFIG --cflags gtk+-2.0 ">=" 2.18 atk 2>/dev/null`
         QT_LIBS_QGTKSTYLE=`$PKG_CONFIG --libs gobject-2.0 2>/dev/null`
     fi
     if [ -n "$QT_CFLAGS_QGTKSTYLE" ] ; then
@@ -4765,6 +4808,11 @@ if [ "$CFG_XCB" != "no" ]; then
         CFG_XCB=yes
         if compileTest qpa/xcb-render "xcb-render" $QMAKE_CFLAGS_XCB $QMAKE_LIBS_XCB; then
             QT_CONFIG="$QT_CONFIG xcb-render"
+        fi
+
+        if compileTest qpa/xcb-glx "xcb-glx" $QMAKE_CFLAGS_XCB $QMAKE_LIBS_XCB; then
+            CFG_XCB_GLX=yes
+            QT_CONFIG="$QT_CONFIG xcb-glx"
         fi
 
         if compileTest qpa/xcb-poll-for-queued-event "xcb-poll-for-queued-event" $QMAKE_CFLAGS_XCB $QMAKE_LIBS_XCB; then
@@ -5425,6 +5473,7 @@ fi
 [ "$CFG_MAC_HARFBUZZ" = "yes" ] && QT_CONFIG="$QT_CONFIG harfbuzz"
 [ "$CFG_XCB" = "yes" ] && QT_CONFIG="$QT_CONFIG xcb"
 [ "$CFG_XINPUT2" = "yes" ] && QT_CONFIG="$QT_CONFIG xinput2"
+[ "$CFG_SYSTEM_PROXIES" = "yes" ] && QT_CONFIG="$QT_CONFIG system-proxies"
 
 [ '!' -z "$DEFINES" ] && QMakeVar add DEFINES "$DEFINES"
 [ '!' -z "$L_FLAGS" ] && QMakeVar add LIBS "$L_FLAGS"
@@ -6091,8 +6140,7 @@ cat >>"$CACHEFILE.tmp" <<EOF
 QT_SOURCE_TREE = \$\$quote($relpath)
 QT_BUILD_TREE = \$\$quote($outpath)
 
-include(\$\$PWD/mkspecs/qmodule.pri)
-CONFIG += dylib fix_output_dirs no_private_qt_headers_warning QTDIR_build
+CONFIG += fix_output_dirs no_private_qt_headers_warning QTDIR_build
 
 EOF
 
@@ -6203,6 +6251,11 @@ fi
 echo "zlib support ........... $CFG_ZLIB"
 echo "Session management ..... $CFG_SM"
 echo "libudev support ........ $CFG_LIBUDEV"
+
+if [ "$XPLATFORM_QNX" = "yes" ]; then
+    echo "SLOG2 support .......... $CFG_SLOG2"
+fi
+echo "Use system proxies ..... $CFG_SYSTEM_PROXIES"
 
 if [ "$CFG_OPENGL" = "desktop" ]; then
     echo "OpenGL support ......... yes (Desktop OpenGL)"

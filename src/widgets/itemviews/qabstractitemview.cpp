@@ -62,7 +62,6 @@
 #include <qaccessible.h>
 #include <qaccessible2.h>
 #endif
-#include <private/qsoftkeymanager_p.h>
 #ifndef QT_NO_GESTURE
 #  include <qscroller.h>
 #endif
@@ -94,9 +93,6 @@ QAbstractItemViewPrivate::QAbstractItemViewPrivate()
         overwrite(false),
         dropIndicatorPosition(QAbstractItemView::OnItem),
         defaultDropAction(Qt::IgnoreAction),
-#endif
-#ifdef QT_SOFTKEYS_ENABLED
-        doneSoftKey(0),
 #endif
         autoScroll(true),
         autoScrollMargin(16),
@@ -139,10 +135,6 @@ void QAbstractItemViewPrivate::init()
     viewport->setBackgroundRole(QPalette::Base);
 
     q->setAttribute(Qt::WA_InputMethodEnabled);
-
-#ifdef QT_SOFTKEYS_ENABLED
-    doneSoftKey = QSoftKeyManager::createKeyedAction(QSoftKeyManager::DoneSoftKey, Qt::Key_Back, q);
-#endif
 }
 
 void QAbstractItemViewPrivate::setHoverIndex(const QPersistentModelIndex &index)
@@ -1108,13 +1100,10 @@ void QAbstractItemView::reset()
     if (d->selectionModel)
         d->selectionModel->reset();
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(this)->table2Interface()->modelReset();
-        QAccessibleEvent event(this, QAccessible::TableModelChanged);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(this, QAccessibleTableModelChangeEvent::ModelReset);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -1614,11 +1603,6 @@ bool QAbstractItemView::event(QEvent *event)
     case QEvent::FontChange:
         d->doDelayedItemsLayout(); // the size of the items will change
         break;
-#ifdef QT_SOFTKEYS_ENABLED
-    case QEvent::LanguageChange:
-        d->doneSoftKey->setText(QSoftKeyManager::standardSoftKeyText(QSoftKeyManager::DoneSoftKey));
-        break;
-#endif
     default:
         break;
     }
@@ -2200,11 +2184,6 @@ void QAbstractItemView::focusOutEvent(QFocusEvent *event)
     Q_D(QAbstractItemView);
     QAbstractScrollArea::focusOutEvent(event);
     d->viewport->update();
-
-#ifdef QT_SOFTKEYS_ENABLED
-    if(!hasEditFocus())
-        removeAction(d->doneSoftKey);
-#endif
 }
 
 /*!
@@ -2229,23 +2208,12 @@ void QAbstractItemView::keyPressEvent(QKeyEvent *event)
         if (QApplication::keypadNavigationEnabled()) {
             if (!hasEditFocus()) {
                 setEditFocus(true);
-#ifdef QT_SOFTKEYS_ENABLED
-                // If we can't keypad navigate to any direction, there is no sense to add
-                // "Done" softkey, since it basically does nothing when there is
-                // only one widget in screen
-                if(QWidgetPrivate::canKeypadNavigate(Qt::Horizontal)
-                        || QWidgetPrivate::canKeypadNavigate(Qt::Vertical))
-                    addAction(d->doneSoftKey);
-#endif
                 return;
             }
         }
         break;
     case Qt::Key_Back:
         if (QApplication::keypadNavigationEnabled() && hasEditFocus()) {
-#ifdef QT_SOFTKEYS_ENABLED
-            removeAction(d->doneSoftKey);
-#endif
             setEditFocus(false);
         } else {
             event->ignore();
@@ -3243,12 +3211,22 @@ void QAbstractItemView::dataChanged(const QModelIndex &topLeft, const QModelInde
             // otherwise the items will be update later anyway
             update(topLeft);
         }
-        return;
+    } else {
+        d->updateEditorData(topLeft, bottomRight);
+        if (isVisible() && !d->delayedPendingLayout)
+            d->viewport->update();
     }
-    d->updateEditorData(topLeft, bottomRight);
-    if (!isVisible() || d->delayedPendingLayout)
-        return; // no need to update
-    d->viewport->update();
+
+#ifndef QT_NO_ACCESSIBILITY
+    if (QAccessible::isActive()) {
+        QAccessibleTableModelChangeEvent accessibleEvent(this, QAccessibleTableModelChangeEvent::DataChanged);
+        accessibleEvent.setFirstRow(topLeft.row());
+        accessibleEvent.setFirstColumn(topLeft.column());
+        accessibleEvent.setLastRow(bottomRight.row());
+        accessibleEvent.setLastColumn(bottomRight.column());
+        QAccessible::updateAccessibility(&accessibleEvent);
+    }
+#endif
 }
 
 /*!
@@ -3343,13 +3321,12 @@ void QAbstractItemViewPrivate::_q_rowsRemoved(const QModelIndex &index, int star
         q->updateEditorGeometries();
     q->setState(QAbstractItemView::NoState);
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(q)->table2Interface()->rowsRemoved(index, start, end);
-        QAccessibleEvent event(QAccessible::TableModelChanged, q, 0);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(q, QAccessibleTableModelChangeEvent::RowsRemoved);
+        accessibleEvent.setFirstRow(start);
+        accessibleEvent.setLastRow(end);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -3424,13 +3401,12 @@ void QAbstractItemViewPrivate::_q_columnsRemoved(const QModelIndex &index, int s
         q->updateEditorGeometries();
     q->setState(QAbstractItemView::NoState);
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(q)->table2Interface()->columnsRemoved(index, start, end);
-        QAccessibleEvent event(QAccessible::TableModelChanged, q, 0);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(q, QAccessibleTableModelChangeEvent::ColumnsRemoved);
+        accessibleEvent.setFirstColumn(start);
+        accessibleEvent.setLastColumn(end);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -3447,14 +3423,13 @@ void QAbstractItemViewPrivate::_q_rowsInserted(const QModelIndex &index, int sta
     Q_UNUSED(end)
 
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     Q_Q(QAbstractItemView);
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(q)->table2Interface()->rowsInserted(index, start, end);
-        QAccessibleEvent event(QAccessible::TableModelChanged, q, 0);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(q, QAccessibleTableModelChangeEvent::RowsInserted);
+        accessibleEvent.setFirstRow(start);
+        accessibleEvent.setLastRow(end);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -3473,13 +3448,12 @@ void QAbstractItemViewPrivate::_q_columnsInserted(const QModelIndex &index, int 
     if (q->isVisible())
         q->updateEditorGeometries();
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(q)->table2Interface()->columnsInserted(index, start, end);
-        QAccessibleEvent event(QAccessible::TableModelChanged, q, 0);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(q, QAccessibleTableModelChangeEvent::ColumnsInserted);
+        accessibleEvent.setFirstColumn(start);
+        accessibleEvent.setLastColumn(end);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -3501,14 +3475,11 @@ void QAbstractItemViewPrivate::_q_layoutChanged()
 {
     doDelayedItemsLayout();
 #ifndef QT_NO_ACCESSIBILITY
-#ifdef Q_WS_X11
     Q_Q(QAbstractItemView);
     if (QAccessible::isActive()) {
-        QAccessible::queryAccessibleInterface(q)->table2Interface()->modelReset();
-        QAccessibleEvent event(QAccessible::TableModelChanged, q, 0);
-        QAccessible::updateAccessibility(&event);
+        QAccessibleTableModelChangeEvent accessibleEvent(q, QAccessibleTableModelChangeEvent::ModelReset);
+        QAccessible::updateAccessibility(&accessibleEvent);
     }
-#endif
 #endif
 }
 
@@ -4118,8 +4089,12 @@ void QAbstractItemViewPrivate::updateEditorData(const QModelIndex &tl, const QMo
     // we are counting on having relatively few editors
     const bool checkIndexes = tl.isValid() && br.isValid();
     const QModelIndex parent = tl.parent();
-    QIndexEditorHash::const_iterator it = indexEditorHash.constBegin();
-    for (; it != indexEditorHash.constEnd(); ++it) {
+    // QTBUG-25370: We need to copy the indexEditorHash, because while we're
+    // iterating over it, we are calling methods which can allow user code to
+    // call a method on *this which can modify the member indexEditorHash.
+    const QIndexEditorHash indexEditorHashCopy = indexEditorHash;
+    QIndexEditorHash::const_iterator it = indexEditorHashCopy.constBegin();
+    for (; it != indexEditorHashCopy.constEnd(); ++it) {
         QWidget *editor = it.value().widget.data();
         const QModelIndex index = it.key();
         if (it.value().isStatic || !editor || !index.isValid() ||

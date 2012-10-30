@@ -108,7 +108,6 @@ protected slots:
     void onStatusMessageChanged(const QString &);
     void onStatusTipTimer();
     void deleteAction(QAction *a) { delete a; }
-    void populateMenu();
 private:
     void createActions();
     QMenu *menus[2], *lastMenu;
@@ -242,28 +241,11 @@ void tst_QMenu::onStatusMessageChanged(const QString &s)
     statustip=s;
 }
 
-void tst_QMenu::populateMenu()
-{
-    //just adds 3 dummy actions and a separator.
-    lastMenu->addAction("Foo");
-    lastMenu->addAction("Bar");
-    lastMenu->addAction("FooBar");
-    lastMenu->addSeparator();
-}
-
 void tst_QMenu::addActionsAndClear()
 {
-#ifdef QT_SOFTKEYS_ENABLED
-    // Softkeys add extra "Select" and "Back" actions to menu by default.
-    // Two first actions will be Select and Back when softkeys are enabled
-    int numSoftkeyActions = 2;
-#else
-    int numSoftkeyActions = 0;
-#endif
-
-    QCOMPARE(menus[0]->actions().count(), 0 + numSoftkeyActions);
+    QCOMPARE(menus[0]->actions().count(), 0);
     createActions();
-    QCOMPARE(menus[0]->actions().count(), 8 + numSoftkeyActions);
+    QCOMPARE(menus[0]->actions().count(), 8);
     menus[0]->clear();
     QCOMPARE(menus[0]->actions().count(), 0);
 }
@@ -376,7 +358,7 @@ void tst_QMenu::keyboardNavigation()
 
 #ifdef Q_OS_MAC
 QT_BEGIN_NAMESPACE
-    extern bool qt_tab_all_widgets; // from qapplication.cpp
+extern bool qt_tab_all_widgets(); // from qapplication.cpp
 QT_END_NAMESPACE
 #endif
 
@@ -388,7 +370,7 @@ void tst_QMenu::focus()
     menu.addAction("Three");
 
 #ifdef Q_OS_MAC
-    if (!qt_tab_all_widgets)
+    if (!qt_tab_all_widgets())
         QSKIP("Computer is currently set up to NOT tab to all widgets,"
              " this test assumes you can tab to all widgets");
 #endif
@@ -458,7 +440,7 @@ void tst_QMenu::statusTip()
 {
     //check that the statustip of actions inserted into the menu are displayed
     QMainWindow w;
-    connect(w.statusBar(), SIGNAL(messageChanged(const QString &)), SLOT(onStatusMessageChanged(const QString &)));; //creates the status bar
+    connect(w.statusBar(), SIGNAL(messageChanged(QString)), SLOT(onStatusMessageChanged(QString)));; //creates the status bar
     QToolBar tb;
     QAction a("main action", &tb);
     a.setStatusTip("main action");
@@ -740,11 +722,6 @@ void tst_QMenu::menuSizeHint()
     int maxWidth =0;
     QRect result;
     foreach (QAction *action, menu.actions()) {
-#ifdef QT_SOFTKEYS_ENABLED
-        // Softkey actions are not widgets and have no geometry.
-        if (menu.actionGeometry(action).topLeft() == QPoint(0,0))
-            continue;
-#endif
         maxWidth = qMax(maxWidth, menu.actionGeometry(action).width());
         result |= menu.actionGeometry(action);
         QCOMPARE(result.x(), left + hmargin + panelWidth);
@@ -823,14 +800,37 @@ void tst_QMenu::deleteActionInTriggered()
     QVERIFY(!a);
 }
 
+class PopulateOnAboutToShowTestMenu : public QMenu {
+    Q_OBJECT
+public:
+    explicit PopulateOnAboutToShowTestMenu(QWidget *parent = 0);
+
+public slots:
+    void populateMenu();
+};
+
+PopulateOnAboutToShowTestMenu::PopulateOnAboutToShowTestMenu(QWidget *parent) : QMenu(parent)
+{
+    connect(this, SIGNAL(aboutToShow()), this, SLOT(populateMenu()));
+}
+
+void PopulateOnAboutToShowTestMenu::populateMenu()
+{
+    // just adds 3 dummy actions and a separator.
+    addAction("Foo");
+    addAction("Bar");
+    addAction("FooBar");
+    addSeparator();
+}
+
 void tst_QMenu::pushButtonPopulateOnAboutToShow()
 {
     QPushButton b("Test PushButton");
     b.setWindowFlags(Qt::FramelessWindowHint | Qt::X11BypassWindowManagerHint);
-    lastMenu = new QMenu;
-    b.setMenu(lastMenu);
+
+    QMenu *buttonMenu= new PopulateOnAboutToShowTestMenu(&b);
+    b.setMenu(buttonMenu);
     const int scrNumber = QApplication::desktop()->screenNumber(&b);
-    connect(lastMenu, SIGNAL(aboutToShow()), this, SLOT(populateMenu()));
     b.show();
     const QRect screen = QApplication::desktop()->screenGeometry(scrNumber);
 
@@ -850,17 +850,17 @@ void tst_QMenu::pushButtonPopulateOnAboutToShow()
         QSKIP("Your window manager won't allow a window against the bottom of the screen");
     }
 
-    QTimer::singleShot(300,lastMenu, SLOT(hide()));
+    QTimer::singleShot(300, buttonMenu, SLOT(hide()));
     QTest::mouseClick(&b, Qt::LeftButton, Qt::NoModifier, b.rect().center());
-    QVERIFY(!lastMenu->geometry().intersects(b.geometry()));
+    QVERIFY(!buttonMenu->geometry().intersects(b.geometry()));
 
     // note: we're assuming that, if we previously got the desired geometry, we'll get it here too
-    b.move(10, screen.bottom()-lastMenu->height()-5);
-    QTimer::singleShot(300,lastMenu, SLOT(hide()));
+    b.move(10, screen.bottom()-buttonMenu->height()-5);
+    QTimer::singleShot(300, buttonMenu, SLOT(hide()));
     QTest::mouseClick(&b, Qt::LeftButton, Qt::NoModifier, b.rect().center());
-    QVERIFY(!lastMenu->geometry().intersects(b.geometry()));
-
+    QVERIFY(!buttonMenu->geometry().intersects(b.geometry()));
 }
+
 void tst_QMenu::QTBUG7907_submenus_autoselect()
 {
     QMenu menu("Test Menu");

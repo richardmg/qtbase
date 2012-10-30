@@ -397,7 +397,6 @@ QWidget *QApplicationPrivate::active_window = 0;        // toplevel with keyboar
 #ifndef QT_NO_WHEELEVENT
 int QApplicationPrivate::wheel_scroll_lines;   // number of lines to scroll
 #endif
-bool Q_WIDGETS_EXPORT qt_tab_all_widgets = true;
 bool qt_in_tab_key_event = false;
 int qt_antialiasing_threshold = -1;
 QSize QApplicationPrivate::app_strut = QSize(0,0); // no default application strut
@@ -414,6 +413,13 @@ bool qt_tabletChokeMouse = false;
 inline bool QApplicationPrivate::isAlien(QWidget *widget)
 {
     return widget && !widget->isWindow();
+}
+
+bool Q_WIDGETS_EXPORT qt_tab_all_widgets()
+{
+    if (const QPlatformTheme *theme = QGuiApplicationPrivate::platformTheme())
+        return theme->themeHint(QPlatformTheme::TabAllWidgets).toBool();
+    return true;
 }
 
 // ######## move to QApplicationPrivate
@@ -896,7 +902,6 @@ bool QApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventLis
           || event->type() == QEvent::Resize
           || event->type() == QEvent::Move
           || event->type() == QEvent::LanguageChange
-          || event->type() == QEvent::UpdateSoftKeys
           || event->type() == QEvent::InputMethod)) {
         for (QPostEventList::const_iterator it = postedEvents->constBegin(); it != postedEvents->constEnd(); ++it) {
             const QPostEvent &cur = *it;
@@ -910,8 +915,6 @@ bool QApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventLis
             } else if (cur.event->type() == QEvent::Move) {
                 ((QMoveEvent *)(cur.event))->p = ((QMoveEvent *)event)->p;
             } else if (cur.event->type() == QEvent::LanguageChange) {
-                ;
-            } else if (cur.event->type() == QEvent::UpdateSoftKeys) {
                 ;
             } else if ( cur.event->type() == QEvent::InputMethod ) {
                 *(QInputMethodEvent *)(cur.event) = *(QInputMethodEvent *)event;
@@ -1206,7 +1209,7 @@ void QApplication::setStyle(QStyle *style)
     Requests a QStyle object for \a style from the QStyleFactory.
 
     The string must be one of the QStyleFactory::keys(), typically one of
-    "windows", "cleanlooks", "plastique", "windowsxp", or "macintosh". Style
+    "windows", "fusion", "windowsxp", or "macintosh". Style
     names are case insensitive.
 
     Returns 0 if an unknown \a style is passed, otherwise the QStyle object
@@ -2080,7 +2083,7 @@ void QApplication::setActiveWindow(QWidget* act)
 */
 QWidget *QApplicationPrivate::focusNextPrevChild_helper(QWidget *toplevel, bool next)
 {
-    uint focus_flag = qt_tab_all_widgets ? Qt::TabFocus : Qt::StrongFocus;
+    uint focus_flag = qt_tab_all_widgets() ? Qt::TabFocus : Qt::StrongFocus;
 
     QWidget *f = toplevel->focusWidget();
     if (!f)

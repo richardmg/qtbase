@@ -256,8 +256,6 @@ public:
         RequestSoftwareInputPanel = 199,
         CloseSoftwareInputPanel = 200,
 
-        UpdateSoftKeys = 201,                   // Internal for compressing soft key updates
-
         WinIdChange = 203,
 #ifndef QT_NO_GESTURES
         Gesture = 198,
@@ -278,6 +276,8 @@ public:
         SockClose = 211,                        // socket closed
 
         PlatformPanel = 212,
+
+        StyleAnimationUpdate = 213,             // style animation target should be updated
 
         // 512 reserved for Qt Jambi's MetaCall event
         // 513 reserved for Qt Jambi's DeleteOnMainThread event

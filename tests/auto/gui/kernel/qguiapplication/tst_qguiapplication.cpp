@@ -107,7 +107,7 @@ void tst_QGuiApplication::focusObject()
     DummyWindow window2;
     window1.show();
 
-    QSignalSpy spy(&app, SIGNAL(focusObjectChanged(QObject *)));
+    QSignalSpy spy(&app, SIGNAL(focusObjectChanged(QObject*)));
 
 
     // verify active window focus propagates to qguiapplication
@@ -278,11 +278,11 @@ void tst_QGuiApplication::keyboardModifiers()
     QCOMPARE(QGuiApplication::keyboardModifiers(), Qt::ControlModifier);
 
     // shortcut events
-    QWindowSystemInterface::tryHandleSynchronousShortcutEvent(window, Qt::Key_5, Qt::MetaModifier);
+    QWindowSystemInterface::tryHandleShortcutEvent(window, Qt::Key_5, Qt::MetaModifier);
     QCOMPARE(QGuiApplication::keyboardModifiers(), Qt::MetaModifier);
-    QWindowSystemInterface::tryHandleSynchronousShortcutEvent(window, Qt::Key_Period, Qt::NoModifier);
+    QWindowSystemInterface::tryHandleShortcutEvent(window, Qt::Key_Period, Qt::NoModifier);
     QCOMPARE(QGuiApplication::keyboardModifiers(), Qt::NoModifier);
-    QWindowSystemInterface::tryHandleSynchronousShortcutEvent(window, Qt::Key_0, Qt::ControlModifier);
+    QWindowSystemInterface::tryHandleShortcutEvent(window, Qt::Key_0, Qt::ControlModifier);
     QCOMPARE(QGuiApplication::keyboardModifiers(), Qt::ControlModifier);
 
     // key events

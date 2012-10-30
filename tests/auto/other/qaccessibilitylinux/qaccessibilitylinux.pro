@@ -1,4 +1,9 @@
 CONFIG += testcase
+
+# This is temporary to start running the test as part of normal CI.
+CONFIG += insignificant_test # QTBUG-27732
+
+
 TARGET = tst_qaccessibilitylinux
 SOURCES += tst_qaccessibilitylinux.cpp \
     ../../../../src/platformsupport/linuxaccessibility/dbusconnection.cpp \

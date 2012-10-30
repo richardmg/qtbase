@@ -264,6 +264,35 @@ struct QCoreApplicationData {
            data->deref(); // deletes the data and the adopted thread
        }
     }
+
+#ifdef Q_OS_BLACKBERRY
+    //The QCoreApplicationData struct is only populated on demand, because it is rarely needed and would
+    //affect startup time
+    void loadManifest() {
+        static bool manifestLoadAttempt = false;
+        if (manifestLoadAttempt)
+            return;
+
+        manifestLoadAttempt = true;
+
+        QFile metafile(QStringLiteral("app/META-INF/MANIFEST.MF"));
+        if (!metafile.open(QIODevice::ReadOnly)) {
+            qWarning() << Q_FUNC_INFO << "Could not open application metafile for reading";
+        } else {
+            while (!metafile.atEnd() && (application.isEmpty() || applicationVersion.isEmpty() || orgName.isEmpty())) {
+                QByteArray line = metafile.readLine();
+                if (line.startsWith("Application-Name:"))
+                    application = QString::fromUtf8(line.mid(18).trimmed());
+                else if (line.startsWith("Application-Version:"))
+                    applicationVersion = QString::fromUtf8(line.mid(21).trimmed());
+                else if (line.startsWith("Package-Author:"))
+                    orgName = QString::fromUtf8(line.mid(16).trimmed());
+            }
+            metafile.close();
+        }
+    }
+#endif
+
     QString orgName, orgDomain, application;
     QString applicationVersion;
 
@@ -362,16 +391,6 @@ void QCoreApplicationPrivate::createEventDispatcher()
 #  error "QEventDispatcher not yet ported to this platform"
 #endif
 }
-
-void QCoreApplicationPrivate::_q_initializeProcessManager()
-{
-#ifndef QT_NO_PROCESS
-#  ifdef Q_OS_UNIX
-    QProcessPrivate::initializeProcessManager();
-#  endif
-#endif
-}
-
 
 QThread *QCoreApplicationPrivate::theMainThread = 0;
 QThread *QCoreApplicationPrivate::mainThread()
@@ -558,8 +577,12 @@ void QCoreApplication::flush()
     \a argc must be greater than zero and \a argv must contain at least
     one valid character string.
 */
-QCoreApplication::QCoreApplication(int &argc, char **argv, int _internal)
-: QObject(*new QCoreApplicationPrivate(argc, argv, _internal))
+QCoreApplication::QCoreApplication(int &argc, char **argv
+#ifndef Q_QDOC
+                                   , int _internal
+#endif
+                                   )
+    : QObject(*new QCoreApplicationPrivate(argc, argv, _internal))
 {
     init();
     QCoreApplicationPrivate::eventDispatcher->startingUp();
@@ -594,6 +617,12 @@ void QCoreApplication::init()
 #ifndef QT_NO_LIBRARY
     if (coreappdata()->app_libpaths)
         d->appendApplicationPathToLibraryPaths();
+#endif
+
+#if defined(Q_OS_UNIX) && !(defined(QT_NO_PROCESS))
+    // Make sure the process manager thread object is created in the main
+    // thread.
+    QProcessPrivate::initializeProcessManager();
 #endif
 
 #ifdef QT_EVAL
@@ -673,7 +702,17 @@ bool QCoreApplication::testAttribute(Qt::ApplicationAttribute attribute)
     return QCoreApplicationPrivate::testAttribute(attribute);
 }
 
-/*!/
+
+/*!
+    \property QCoreApplication::quitLockEnabled
+
+    Returns true if the use of the QEventLoopLocker feature can cause the
+    application to quit, otherwise returns false.
+
+    \sa QEventLoopLocker
+*/
+
+/*!
     Returns true if the use of the QEventLoopLocker feature can cause the
     application to quit, otherwise returns false.
 
@@ -978,7 +1017,7 @@ int QCoreApplication::exec()
     if (self) {
         self->d_func()->in_exec = false;
         if (!self->d_func()->aboutToQuitEmitted)
-            emit self->aboutToQuit();
+            emit self->aboutToQuit(QPrivateSignal());
         self->d_func()->aboutToQuitEmitted = true;
         sendPostedEvents(0, QEvent::DeferredDelete);
     }
@@ -1765,6 +1804,13 @@ QString QCoreApplication::applicationFilePath()
 #if defined(Q_OS_WIN)
     d->cachedApplicationFilePath = QFileInfo(qAppFileName()).filePath();
     return d->cachedApplicationFilePath;
+#elif defined(Q_OS_BLACKBERRY)
+    QDir dir(QStringLiteral("./app/native/"));
+    QStringList executables = dir.entryList(QDir::Executable | QDir::Files);
+    if (!executables.empty()) {
+        //We assume that there is only one executable in the folder
+        return dir.absoluteFilePath(executables.first());
+    }
 #elif defined(Q_OS_MAC)
     QString qAppFileName_str = qAppFileName();
     if(!qAppFileName_str.isEmpty()) {
@@ -1930,6 +1976,9 @@ void QCoreApplication::setOrganizationName(const QString &orgName)
 
 QString QCoreApplication::organizationName()
 {
+#ifdef Q_OS_BLACKBERRY
+    coreappdata()->loadManifest();
+#endif
     return coreappdata()->orgName;
 }
 
@@ -1977,6 +2026,9 @@ void QCoreApplication::setApplicationName(const QString &application)
 
 QString QCoreApplication::applicationName()
 {
+#ifdef Q_OS_BLACKBERRY
+    coreappdata()->loadManifest();
+#endif
     QString appname = coreappdata() ? coreappdata()->application : QString();
     if (appname.isEmpty() && QCoreApplication::self)
         appname = QCoreApplication::self->d_func()->appName();
@@ -2003,6 +2055,9 @@ void QCoreApplication::setApplicationVersion(const QString &version)
 
 QString QCoreApplication::applicationVersion()
 {
+#ifdef Q_OS_BLACKBERRY
+    coreappdata()->loadManifest();
+#endif
     return coreappdata()->applicationVersion;
 }
 
@@ -2179,7 +2234,7 @@ void QCoreApplication::installNativeEventFilter(QAbstractNativeEventFilter *filt
 }
 
 /*!
-    Removes an event filter object \a obj from this object. The
+    Removes an event \a filterObject from this object. The
     request is ignored if such an event filter has not been installed.
 
     All event filters for this object are automatically removed when
@@ -2191,12 +2246,12 @@ void QCoreApplication::installNativeEventFilter(QAbstractNativeEventFilter *filt
     \sa installNativeEventFilter()
     \since 5.0
 */
-void QCoreApplication::removeNativeEventFilter(QAbstractNativeEventFilter *filterObj)
+void QCoreApplication::removeNativeEventFilter(QAbstractNativeEventFilter *filterObject)
 {
     QAbstractEventDispatcher *eventDispatcher = QAbstractEventDispatcher::instance();
-    if (!filterObj || !eventDispatcher)
+    if (!filterObject || !eventDispatcher)
         return;
-    eventDispatcher->removeNativeEventFilter(filterObj);
+    eventDispatcher->removeNativeEventFilter(filterObject);
 }
 
 /*!
@@ -2317,5 +2372,3 @@ void QCoreApplication::setEventDispatcher(QAbstractEventDispatcher *eventDispatc
 */
 
 QT_END_NAMESPACE
-
-#include "moc_qcoreapplication.cpp"

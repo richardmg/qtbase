@@ -68,6 +68,8 @@ class QDocDatabase;
 class Generator
 {
 public:
+    enum Passes { Both, Prepare, Generate };
+
     Generator();
     virtual ~Generator();
 
@@ -86,6 +88,13 @@ public:
     static void terminate();
     static void writeOutFileNames();
     static void augmentImageDirs(QSet<QString>& moreImageDirs);
+    static void debugSegfault(const QString& message);
+    static void setDebugSegfaultFlag(bool b);
+    static bool debugging() { return debugging_; }
+    static bool noLinkErrors() { return noLinkErrors_; }
+    static void setQDocPass(Passes pass) { qdocPass_ = pass; }
+    static bool runPrepareOnly() { return (qdocPass_ == Prepare); }
+    static bool runGenerateOnly() { return (qdocPass_ == Generate); }
 
 protected:
     virtual void beginSubPage(const InnerNode* node, const QString& fileName);
@@ -187,6 +196,9 @@ private:
     static QStringList scriptFiles;
     static QStringList styleDirs;
     static QStringList styleFiles;
+    static bool debugging_;
+    static bool noLinkErrors_;
+    static Passes qdocPass_;
 
     void appendFullName(Text& text,
                         const Node *apparentNode,

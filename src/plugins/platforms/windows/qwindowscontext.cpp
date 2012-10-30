@@ -210,7 +210,9 @@ bool QWindowsUser32DLL::initTouch()
     \ingroup qt-lighthouse-win
 */
 
-QWindowsShell32DLL::QWindowsShell32DLL() : sHCreateItemFromParsingName(0)
+QWindowsShell32DLL::QWindowsShell32DLL()
+    : sHCreateItemFromParsingName(0)
+    , sHGetStockIconInfo(0)
 {
 }
 
@@ -218,6 +220,7 @@ void QWindowsShell32DLL::init()
 {
     QSystemLibrary library(QStringLiteral("shell32"));
     sHCreateItemFromParsingName = (SHCreateItemFromParsingName)(library.resolve("SHCreateItemFromParsingName"));
+    sHGetStockIconInfo = (SHGetStockIconInfo)library.resolve("SHGetStockIconInfo");
 }
 
 QWindowsUser32DLL QWindowsContext::user32dll;
@@ -256,6 +259,7 @@ struct QWindowsContextPrivate {
     const HRESULT m_oleInitializeResult;
     const QByteArray m_eventType;
     QWindow *m_lastActiveWindow;
+    bool m_asyncExpose;
 };
 
 QWindowsContextPrivate::QWindowsContextPrivate() :
@@ -264,7 +268,7 @@ QWindowsContextPrivate::QWindowsContextPrivate() :
     m_defaultDPI(GetDeviceCaps(m_displayContext,LOGPIXELSY)),
     m_oleInitializeResult(OleInitialize(NULL)),
     m_eventType(QByteArrayLiteral("windows_generic_MSG")),
-    m_lastActiveWindow(0)
+    m_lastActiveWindow(0), m_asyncExpose(0)
 {
 #ifndef Q_OS_WINCE
     QWindowsContext::user32dll.init();
@@ -329,6 +333,11 @@ unsigned QWindowsContext::systemInfo() const
 bool QWindowsContext::useRTLExtensions() const
 {
     return d->m_keyMapper.useRTLExtensions();
+}
+
+QList<int> QWindowsContext::possibleKeys(const QKeyEvent *e) const
+{
+    return d->m_keyMapper.possibleKeys(e);
 }
 
 void QWindowsContext::setWindowCreationContext(const QSharedPointer<QWindowCreationContext> &ctx)
@@ -706,13 +715,23 @@ bool QWindowsContext::windowsProc(HWND hwnd, UINT message,
     msg.pt.x = GET_X_LPARAM(lParam);
     msg.pt.y = GET_Y_LPARAM(lParam);
 
+    // Run the native event filters.
     long filterResult = 0;
     QAbstractEventDispatcher* dispatcher = QAbstractEventDispatcher::instance();
     if (dispatcher && dispatcher->filterNativeEvent(d->m_eventType, &msg, &filterResult)) {
         *result = LRESULT(filterResult);
         return true;
     }
-    // Events without an associated QWindow or events we are not interested in.
+
+    QWindowsWindow *platformWindow = findPlatformWindow(hwnd);
+    if (platformWindow) {
+        filterResult = 0;
+        if (QWindowSystemInterface::handleNativeEvent(platformWindow->window(), d->m_eventType, &msg, &filterResult)) {
+            *result = LRESULT(filterResult);
+            return true;
+        }
+    }
+
     switch (et) {
     case QtWindows::InputMethodStartCompositionEvent:
         return QWindowsInputContext::instance()->startComposition(hwnd);
@@ -739,11 +758,12 @@ bool QWindowsContext::windowsProc(HWND hwnd, UINT message,
 #endif
     case QtWindows::DisplayChangedEvent:
         return d->m_screenManager.handleDisplayChange(wParam, lParam);
+    case QtWindows::SettingChangedEvent:
+        return d->m_screenManager.handleScreenChanges();
     default:
         break;
     }
 
-    QWindowsWindow *platformWindow = findPlatformWindow(hwnd);
     // Before CreateWindowEx() returns, some events are sent,
     // for example WM_GETMINMAXINFO asking for size constraints for top levels.
     // Pass on to current creation context
@@ -767,6 +787,9 @@ bool QWindowsContext::windowsProc(HWND hwnd, UINT message,
         }
     }
     if (platformWindow) {
+        // Suppress events sent during DestroyWindow() for native children.
+        if (platformWindow->testFlag(QWindowsWindow::WithinDestroy))
+            return false;
         if (QWindowsContext::verboseEvents > 1)
             qDebug().nospace() << "Event window: " << platformWindow->window();
     } else {
@@ -774,12 +797,6 @@ bool QWindowsContext::windowsProc(HWND hwnd, UINT message,
                  __FUNCTION__, message,
                  QWindowsGuiEventDispatcher::windowsMessageName(message), hwnd);
         return false;
-    }
-
-    filterResult = 0;
-    if (QWindowSystemInterface::handleNativeEvent(platformWindow->window(), d->m_eventType, &msg, &filterResult)) {
-        *result = LRESULT(filterResult);
-        return true;
     }
 
     switch (et) {
@@ -853,6 +870,11 @@ bool QWindowsContext::windowsProc(HWND hwnd, UINT message,
                 QWindowsWindow::baseWindowOf(modalWindow)->alertWindow();
         break;
 #endif
+#ifndef QT_NO_CONTEXTMENU
+    case QtWindows::ContextMenu:
+        handleContextMenuEvent(platformWindow->window(), msg);
+        return true;
+#endif
     default:
         break;
     }
@@ -882,6 +904,34 @@ void QWindowsContext::handleFocusEvent(QtWindows::WindowsEventType et,
          d->m_lastActiveWindow = nextActiveWindow;
          QWindowSystemInterface::handleWindowActivated(nextActiveWindow);
     }
+}
+
+#ifndef QT_NO_CONTEXTMENU
+void QWindowsContext::handleContextMenuEvent(QWindow *window, const MSG &msg)
+{
+    bool mouseTriggered = false;
+    QPoint globalPos;
+    QPoint pos;
+    if (msg.lParam != (int)0xffffffff) {
+        mouseTriggered = true;
+        globalPos.setX(msg.pt.x);
+        globalPos.setY(msg.pt.y);
+        pos = QWindowsGeometryHint::mapFromGlobal(msg.hwnd, globalPos);
+    }
+
+    QWindowSystemInterface::handleContextMenuEvent(window, mouseTriggered, pos, globalPos,
+                                                   QWindowsKeyMapper::queryKeyboardModifiers());
+}
+#endif
+
+bool QWindowsContext::asyncExpose() const
+{
+    return d->m_asyncExpose;
+}
+
+void QWindowsContext::setAsyncExpose(bool value)
+{
+    d->m_asyncExpose = value;
 }
 
 /*!

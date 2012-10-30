@@ -190,6 +190,7 @@ QCocoaWindow::QCocoaWindow(QWindow *tlw, const QCocoaIntegration *platformIntegr
     , m_platformIntegration(platformIntegration)
     , m_nsWindow(0)
     , m_synchedWindowState(Qt::WindowActive)
+    , m_windowModality(Qt::NonModal)
     , m_inConstructor(true)
     , m_glContext(0)
     , m_menubar(0)
@@ -251,6 +252,9 @@ void QCocoaWindow::setVisible(bool visible)
     qDebug() << "QCocoaWindow::setVisible" << window() << visible;
 #endif
     if (visible) {
+        // We need to recreate if the modality has changed as the style mask will need updating
+        if (m_windowModality != window()->windowModality())
+            recreateWindow(parent());
         QCocoaWindow *parentCocoaWindow = 0;
         if (window()->transientParent()) {
             parentCocoaWindow = static_cast<QCocoaWindow *>(window()->transientParent()->handle());
@@ -269,7 +273,8 @@ void QCocoaWindow::setVisible(bool visible)
         }
 
         // Make sure the QWindow has a frame ready before we show the NSWindow.
-        QWindowSystemInterface::handleSynchronousExposeEvent(window(), QRect(QPoint(), geometry().size()));
+        QWindowSystemInterface::handleExposeEvent(window(), QRect(QPoint(), geometry().size()));
+        QWindowSystemInterface::flushWindowSystemEvents();
 
         if (m_nsWindow) {
             // setWindowState might have been called while the window was hidden and
@@ -362,6 +367,8 @@ NSUInteger QCocoaWindow::windowStyleMask(Qt::WindowFlags flags)
                  Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint;
         if (flags == Qt::Window) {
             styleMask = (NSResizableWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSTitledWindowMask);
+        } else if ((flags & Qt::Dialog) && (window()->windowModality() != Qt::NonModal)) {
+            styleMask = NSTitledWindowMask;
         } else if (!(flags & Qt::FramelessWindowHint)) {
             if (flags & Qt::WindowMaximizeButtonHint)
                 styleMask |= NSResizableWindowMask;
@@ -383,7 +390,7 @@ void QCocoaWindow::setWindowShadow(Qt::WindowFlags flags)
     [m_nsWindow setHasShadow:(keepShadow ? YES : NO)];
 }
 
-Qt::WindowFlags QCocoaWindow::setWindowFlags(Qt::WindowFlags flags)
+void QCocoaWindow::setWindowFlags(Qt::WindowFlags flags)
 {
     if (m_nsWindow) {
         NSUInteger styleMask = windowStyleMask(flags);
@@ -394,15 +401,12 @@ Qt::WindowFlags QCocoaWindow::setWindowFlags(Qt::WindowFlags flags)
     }
 
     m_windowFlags = flags;
-    return m_windowFlags;
 }
 
-Qt::WindowState QCocoaWindow::setWindowState(Qt::WindowState state)
+void QCocoaWindow::setWindowState(Qt::WindowState state)
 {
     if ([m_nsWindow isVisible])
         syncWindowState(state);  // Window state set for hidden windows take effect when show() is called.
-
-    return state;
 }
 
 void QCocoaWindow::setWindowTitle(const QString &title)
@@ -424,6 +428,26 @@ void QCocoaWindow::setWindowFilePath(const QString &filePath)
 
     QFileInfo fi(filePath);
     [m_nsWindow setRepresentedFilename: fi.exists() ? QCFString::toNSString(filePath) : @""];
+}
+
+void QCocoaWindow::setWindowIcon(const QIcon &icon)
+{
+    QCocoaAutoReleasePool pool;
+
+    NSButton *iconButton = [m_nsWindow standardWindowButton:NSWindowDocumentIconButton];
+    if (iconButton == nil) {
+        NSString *title = QCFString::toNSString(window()->windowTitle());
+        [m_nsWindow setRepresentedURL:[NSURL fileURLWithPath:title]];
+        iconButton = [m_nsWindow standardWindowButton:NSWindowDocumentIconButton];
+    }
+    if (icon.isNull()) {
+        [iconButton setImage:nil];
+    } else {
+        QPixmap pixmap = icon.pixmap(QSize(22, 22));
+        NSImage *image = static_cast<NSImage *>(qt_mac_create_nsimage(pixmap));
+        [iconButton setImage:image];
+        [image release];
+    }
 }
 
 void QCocoaWindow::raise()
@@ -533,7 +557,8 @@ void QCocoaWindow::windowWillMove()
 {
     // Close any open popups on window move
     if (m_activePopupWindow) {
-        QWindowSystemInterface::handleSynchronousCloseEvent(m_activePopupWindow);
+        QWindowSystemInterface::handleCloseEvent(m_activePopupWindow);
+        QWindowSystemInterface::flushWindowSystemEvents();
         m_activePopupWindow = 0;
     }
 }
@@ -555,7 +580,8 @@ void QCocoaWindow::windowDidResize()
 
 void QCocoaWindow::windowWillClose()
 {
-    QWindowSystemInterface::handleSynchronousCloseEvent(window());
+    QWindowSystemInterface::handleCloseEvent(window());
+    QWindowSystemInterface::flushWindowSystemEvents();
 }
 
 bool QCocoaWindow::windowIsPopupType(Qt::WindowType type) const
@@ -659,7 +685,7 @@ NSWindow * QCocoaWindow::createNSWindow()
 
     NSInteger level = windowLevel(flags);
     [createdWindow setLevel:level];
-
+    m_windowModality = window()->windowModality();
     return createdWindow;
 }
 
@@ -681,16 +707,12 @@ void QCocoaWindow::setNSWindow(NSWindow *window)
                                           name:nil // Get all notifications
                                           object:m_nsWindow];
 
-    // ### Accept touch events by default.
-    // Beware that enabling touch events has a negative impact on the overall performance.
-    // We probably need a QWindowSystemInterface API to enable/disable touch events.
-    [m_contentView setAcceptsTouchEvents:YES];
-
     [window setContentView:m_contentView];
 }
 
 void QCocoaWindow::clearNSWindow(NSWindow *window)
 {
+    [window setContentView:nil];
     [window setDelegate:nil];
     [window clearPlatformWindow];
     [[NSNotificationCenter defaultCenter] removeObserver:m_contentView];
@@ -723,6 +745,15 @@ void QCocoaWindow::syncWindowState(Qt::WindowState newState)
 {
     if (!m_nsWindow)
         return;
+
+    // if content view width or height is 0 then the window animations will crash so
+    // do nothing except set the new state
+    NSRect contentRect = [contentView() frame];
+    if (contentRect.size.width <= 0 || contentRect.size.height <= 0) {
+        qWarning() << Q_FUNC_INFO << "invalid window content view size, check your window geometry";
+        m_synchedWindowState = newState;
+        return;
+    }
 
     if ((m_synchedWindowState & Qt::WindowMaximized) != (newState & Qt::WindowMaximized)) {
         [m_nsWindow performZoom : m_nsWindow]; // toggles

@@ -306,6 +306,11 @@
 #define QT_NO_NETWORKDISKCACHE
 #endif
 
+// QLocalServer
+#if !defined(QT_NO_LOCALSERVER) && (defined(QT_NO_TEMPORARYFILE))
+#define QT_NO_LOCALSERVER
+#endif
+
 // QProgressDialog
 #if !defined(QT_NO_PROGRESSDIALOG) && (defined(QT_NO_PROGRESSBAR))
 #define QT_NO_PROGRESSDIALOG
@@ -319,11 +324,6 @@
 //  SOCKS5
 #if !defined(QT_NO_SOCKS5) && (defined(QT_NO_NETWORKPROXY))
 #define QT_NO_SOCKS5
-#endif
-
-// QSoftKeyManager
-#if !defined(QT_NO_SOFTKEYMANAGER) && (defined(QT_NO_ACTION))
-#define QT_NO_SOFTKEYMANAGER
 #endif
 
 // QSplitter
@@ -389,16 +389,6 @@
 // QScrollArea
 #if !defined(QT_NO_SCROLLAREA) && (defined(QT_NO_SCROLLBAR))
 #define QT_NO_SCROLLAREA
-#endif
-
-// QCleanLooksStyle
-#if !defined(QT_NO_STYLE_CLEANLOOKS) && (defined(QT_NO_STYLE_WINDOWS) || defined(QT_NO_IMAGEFORMAT_XPM))
-#define QT_NO_STYLE_CLEANLOOKS
-#endif
-
-// QPlastiqueStyle
-#if !defined(QT_NO_STYLE_PLASTIQUE) && (defined(QT_NO_STYLE_WINDOWS) || defined(QT_NO_IMAGEFORMAT_XPM))
-#define QT_NO_STYLE_PLASTIQUE
 #endif
 
 // QWindowsCEStyle

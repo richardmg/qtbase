@@ -66,7 +66,6 @@ class Q_WIDGETS_EXPORT QAction : public QObject
     Q_DECLARE_PRIVATE(QAction)
 
     Q_ENUMS(MenuRole)
-    Q_ENUMS(SoftKeyRole)
     Q_ENUMS(Priority)
     Q_PROPERTY(bool checkable READ isCheckable WRITE setCheckable NOTIFY changed)
     Q_PROPERTY(bool checked READ isChecked WRITE setChecked DESIGNABLE isCheckable NOTIFY toggled)
@@ -85,7 +84,6 @@ class Q_WIDGETS_EXPORT QAction : public QObject
 #endif
     Q_PROPERTY(bool visible READ isVisible WRITE setVisible NOTIFY changed)
     Q_PROPERTY(MenuRole menuRole READ menuRole WRITE setMenuRole NOTIFY changed)
-    Q_PROPERTY(SoftKeyRole softKeyRole READ softKeyRole WRITE setSoftKeyRole NOTIFY changed)
     Q_PROPERTY(bool iconVisibleInMenu READ isIconVisibleInMenu WRITE setIconVisibleInMenu NOTIFY changed)
     Q_PROPERTY(Priority priority READ priority WRITE setPriority)
 
@@ -93,8 +91,6 @@ public:
     // note this is copied into qplatformmenu.h, which must stay in sync
     enum MenuRole { NoRole = 0, TextHeuristicRole, ApplicationSpecificRole, AboutQtRole,
                     AboutRole, PreferencesRole, QuitRole };
-    enum SoftKeyRole {
-                    NoSoftKey, PositiveSoftKey, NegativeSoftKey, SelectSoftKey };
     enum Priority { LowPriority = 0,
                     NormalPriority = 128,
                     HighPriority = 256};
@@ -171,9 +167,6 @@ public:
 
     void setMenuRole(MenuRole menuRole);
     MenuRole menuRole() const;
-
-    void setSoftKeyRole(SoftKeyRole softKeyRole);
-    SoftKeyRole softKeyRole() const;
 
     void setIconVisibleInMenu(bool visible);
     bool isIconVisibleInMenu() const;

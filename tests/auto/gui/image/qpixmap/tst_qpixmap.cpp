@@ -109,7 +109,6 @@ private slots:
     void setGetMask();
     void cacheKey();
     void drawBitmap();
-    void grabWindow();
     void isNull();
     void task_246446();
 
@@ -138,6 +137,12 @@ private slots:
     void transformed2();
 
     void fromImage_crash();
+
+    void load();
+    void loadFromData();
+#if !defined(QT_NO_DATASTREAM)
+    void loadFromDataStream();
+#endif
 
     void fromData();
     void loadFromDataNullValues();
@@ -434,12 +439,7 @@ void tst_QPixmap::fill_data()
         QTest::newRow(QString("syscolor_%1").arg(color).toLatin1())
             << uint(color) << true << false;
 
-#ifdef Q_WS_QWS
-    if (QScreen::instance()->depth() >= 24) {
-#elif defined (Q_WS_X11)
-    QPixmap pm(1, 1);
-    if (pm.x11PictureHandle()) {
-#elif defined (Q_OS_WINCE)
+#if defined (Q_OS_WINCE)
     QPixmap pixmap(1,1);
     if (QApplication::desktop()->grab().depth() >= 24) {
 #else
@@ -715,36 +715,6 @@ void tst_QPixmap::drawBitmap()
     expected.fill(Qt::red);
 
     QVERIFY(lenientCompare(pixmap, expected));
-}
-
-void tst_QPixmap::grabWindow()
-{
-//  ### fixme: Check platforms
-    QSKIP("QTBUG-20863 grabWindow is broken on most qpa backends");
-#ifndef QT_NO_WIDGETS
-#ifdef Q_OS_WINCE
-    // We get out of memory, if the desktop itself is too big.
-    if (QApplication::desktop()->width() <= 480)
-#endif
-    QVERIFY(QPixmap::grabWindow(QApplication::desktop()->winId()).isNull() == false);
-    QWidget w;
-    w.resize(640, 480);
-    w.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&w));
-    QVERIFY(QPixmap::grabWindow(w.winId()).isNull() == false);
-
-    QWidget child(&w);
-    child.setGeometry(50, 50, 100, 100);
-    child.setPalette(Qt::red);
-    child.setAutoFillBackground(true);
-    child.show();
-    QTest::qWait(20);
-    const QPixmap grabWidgetPixmap = child.grab();
-    const WId childWinId = child.winId(); // Create native child
-    QVERIFY(QTest::qWaitForWindowExposed(child.windowHandle()));
-    const QPixmap grabWindowPixmap = QPixmap::grabWindow(childWinId);
-    QVERIFY(lenientCompare(grabWindowPixmap, grabWidgetPixmap));
-#endif
 }
 
 void tst_QPixmap::isNull()
@@ -1190,6 +1160,85 @@ void tst_QPixmap::transformed2()
 
     QVERIFY(lenientCompare(actual, expected));
 }
+
+void tst_QPixmap::load()
+{
+    const QString prefix = QFINDTESTDATA("images/");
+    if (prefix.isEmpty())
+        QFAIL("can not find images directory!");
+    const QString filePath = prefix + QLatin1String("designer.png");
+
+    QPixmap dest(filePath);
+    QVERIFY(!dest.isNull());
+    QVERIFY(!dest.load("image_that_does_not_exist.png"));
+    QVERIFY(dest.isNull());
+    QVERIFY(dest.load(filePath));
+    QVERIFY(!dest.isNull());
+}
+
+void tst_QPixmap::loadFromData()
+{
+    const QString prefix = QFINDTESTDATA("images/");
+    if (prefix.isEmpty())
+        QFAIL("can not find images directory!");
+    const QString filePath = prefix + QLatin1String("designer.png");
+
+    QPixmap original(filePath);
+    QVERIFY(!original.isNull());
+
+    QByteArray ba;
+    {
+        QBuffer buf(&ba);
+        QVERIFY(buf.open(QIODevice::WriteOnly));
+        QVERIFY(original.save(&buf, "BMP"));
+    }
+    QVERIFY(!ba.isEmpty());
+
+    QPixmap dest;
+    QVERIFY(dest.loadFromData(ba, "BMP"));
+    QVERIFY(!dest.isNull());
+
+    QCOMPARE(original, dest);
+
+    QVERIFY(!dest.loadFromData(QByteArray()));
+    QVERIFY(dest.isNull());
+}
+
+#if !defined(QT_NO_DATASTREAM)
+void tst_QPixmap::loadFromDataStream()
+{
+    const QString prefix = QFINDTESTDATA("images/");
+    if (prefix.isEmpty())
+        QFAIL("can not find images directory!");
+    const QString filePath = prefix + QLatin1String("designer.png");
+
+    QPixmap original(filePath);
+    QVERIFY(!original.isNull());
+
+    QByteArray ba;
+    {
+        QDataStream s(&ba, QIODevice::WriteOnly);
+        s << original;
+    }
+    QVERIFY(!ba.isEmpty());
+
+    QPixmap dest;
+    {
+        QDataStream s(&ba, QIODevice::ReadOnly);
+        s >> dest;
+    }
+    QVERIFY(!dest.isNull());
+
+    QCOMPARE(original, dest);
+
+    {
+        ba.clear();
+        QDataStream s(&ba, QIODevice::ReadOnly);
+        s >> dest;
+    }
+    QVERIFY(dest.isNull());
+}
+#endif // QT_NO_DATASTREAM
 
 void tst_QPixmap::fromImage_crash()
 {

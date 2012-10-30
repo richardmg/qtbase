@@ -63,15 +63,20 @@ public:
     enum BoundaryType {
         Grapheme,
         Word,
-        Line,
-        Sentence
+        Sentence,
+        Line
     };
 
     enum BoundaryReason {
         NotAtBoundary = 0,
-        StartWord = 1,
-        EndWord = 2,
-        SoftHyphen = 4
+        BreakOpportunity = 0x1f,
+        StartOfItem = 0x20,
+        EndOfItem = 0x40,
+        MandatoryBreak = 0x80,
+        SoftHyphen = 0x100,
+        // ### Qt6: remove
+        StartWord = 0x1000,
+        EndWord = 0x2000
     };
     Q_DECLARE_FLAGS( BoundaryReasons, BoundaryReason )
 

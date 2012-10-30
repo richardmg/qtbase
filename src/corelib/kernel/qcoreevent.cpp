@@ -262,6 +262,7 @@ QT_BEGIN_NAMESPACE
     \omitvalue ShowWindowRequest
     \omitvalue Speech
     \omitvalue Style
+    \omitvalue StyleAnimationUpdate
     \omitvalue ZeroTimerEvent
     \omitvalue ApplicationActivated
     \omitvalue ApplicationDeactivated
@@ -269,7 +270,6 @@ QT_BEGIN_NAMESPACE
     \omitvalue MacGLClearDrawable
     \omitvalue NetworkReplyUpdated
     \omitvalue FutureCallOut
-    \omitvalue UpdateSoftKeys
     \omitvalue NativeGesture
 */
 

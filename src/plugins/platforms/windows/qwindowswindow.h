@@ -126,7 +126,8 @@ public:
         SizeGripOperation = 0x100,
         FrameStrutEventsEnabled = 0x200,
         SynchronousGeometryChangeEvent = 0x400,
-        WithinSetStyle = 0x800
+        WithinSetStyle = 0x800,
+        WithinDestroy = 0x1000
     };
 
     struct WindowData
@@ -158,8 +159,8 @@ public:
     virtual QPoint mapToGlobal(const QPoint &pos) const;
     virtual QPoint mapFromGlobal(const QPoint &pos) const;
 
-    virtual Qt::WindowFlags setWindowFlags(Qt::WindowFlags flags);
-    virtual Qt::WindowState setWindowState(Qt::WindowState state);
+    virtual void setWindowFlags(Qt::WindowFlags flags);
+    virtual void setWindowState(Qt::WindowState state);
 
     HWND handle() const { return m_data.hwnd; }
 
@@ -237,6 +238,7 @@ public:
 
     void setEnabled(bool enabled);
     bool isEnabled() const;
+    void setWindowIcon(const QIcon &icon);
 
 #ifndef Q_OS_WINCE
     void alertWindow(int durationMs = 0);
@@ -258,6 +260,7 @@ private:
     void unregisterDropSite();
     void handleGeometryChange();
     void handleWindowStateChange(Qt::WindowState state);
+    inline void destroyIcon();
 
     mutable WindowData m_data;
     mutable unsigned m_flags;
@@ -276,6 +279,8 @@ private:
 #ifdef Q_OS_WINCE
     bool m_previouslyHidden;
 #endif
+    HICON m_iconSmall;
+    HICON m_iconBig;
 };
 
 // Conveniences for window frames.
@@ -343,6 +348,18 @@ void *QWindowsWindow::userDataOf(HWND hwnd)
 void QWindowsWindow::setUserDataOf(HWND hwnd, void *ud)
 {
     SetWindowLongPtr(hwnd, GWLP_USERDATA, LONG_PTR(ud));
+}
+
+inline void QWindowsWindow::destroyIcon()
+{
+    if (m_iconBig) {
+        DestroyIcon(m_iconBig);
+        m_iconBig = 0;
+    }
+    if (m_iconSmall) {
+        DestroyIcon(m_iconSmall);
+        m_iconSmall = 0;
+    }
 }
 
 QT_END_NAMESPACE

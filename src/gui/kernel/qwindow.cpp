@@ -178,6 +178,7 @@ QWindow::QWindow(QWindow *parent)
         d->screen = parent->screen();
     if (!d->screen)
         d->screen = QGuiApplication::primaryScreen();
+    connect(d->screen, SIGNAL(destroyed(QObject*)), this, SLOT(screenDestroyed(QObject*)));
     QGuiApplicationPrivate::window_list.prepend(this);
 }
 
@@ -203,6 +204,7 @@ QWindow::QWindow(QWindowPrivate &dd, QWindow *parent)
         d->screen = parent->screen();
     if (!d->screen)
         d->screen = QGuiApplication::primaryScreen();
+    connect(d->screen, SIGNAL(destroyed(QObject*)), this, SLOT(screenDestroyed(QObject*)));
     QGuiApplicationPrivate::window_list.prepend(this);
 }
 
@@ -285,6 +287,10 @@ void QWindow::setVisible(bool visible)
             QGuiApplicationPrivate::hideModalWindow(this);
     }
 
+#ifndef QT_NO_CURSOR
+    if (visible)
+        d->applyCursor();
+#endif
     d->platformWindow->setVisible(visible);
 
     if (!visible) {
@@ -513,9 +519,8 @@ void QWindow::setWindowFlags(Qt::WindowFlags flags)
 {
     Q_D(QWindow);
     if (d->platformWindow)
-        d->windowFlags = d->platformWindow->setWindowFlags(flags);
-    else
-        d->windowFlags = flags;
+        d->platformWindow->setWindowFlags(flags);
+    d->windowFlags = flags;
 }
 
 /*!
@@ -835,9 +840,8 @@ void QWindow::setWindowState(Qt::WindowState state)
 
     Q_D(QWindow);
     if (d->platformWindow)
-        d->windowState = d->platformWindow->setWindowState(state);
-    else
-        d->windowState = state;
+        d->platformWindow->setWindowState(state);
+    d->windowState = state;
 }
 
 /*!
@@ -1879,11 +1883,10 @@ QCursor QWindow::cursor() const
 void QWindow::setCursor(const QCursor &cursor)
 {
     Q_D(QWindow);
-    if (QPlatformCursor *platformCursor = d->screen->handle()->cursor()) {
-        d->cursor = cursor;
-        QCursor *oc = QGuiApplication::overrideCursor();
-        QCursor c = oc ? *oc : d->cursor;
-        platformCursor->changeCursor(&c, this);
+    d->cursor = cursor;
+    // Only attempt to set cursor and emit signal if there is an actual platform cursor
+    if (d->screen->handle()->cursor()) {
+        d->applyCursor();
         QEvent event(QEvent::CursorChange);
         QGuiApplication::sendEvent(this, &event);
     }
@@ -1894,19 +1897,20 @@ void QWindow::setCursor(const QCursor &cursor)
  */
 void QWindow::unsetCursor()
 {
-    Q_D(QWindow);
-    if (QPlatformCursor *platformCursor = d->screen->handle()->cursor()) {
-        d->cursor = Qt::ArrowCursor;
-        QCursor *oc = QGuiApplication::overrideCursor();
-        if (!oc) {
-            QCursor c = d->cursor;
-            platformCursor->changeCursor(&c, this);
-        }
-        QEvent event(QEvent::CursorChange);
-        QGuiApplication::sendEvent(this, &event);
-    }
+    setCursor(Qt::ArrowCursor);
 }
 
+void QWindowPrivate::applyCursor()
+{
+    Q_Q(QWindow);
+    if (platformWindow) {
+        if (QPlatformCursor *platformCursor = screen->handle()->cursor()) {
+            QCursor *oc = QGuiApplication::overrideCursor();
+            QCursor c = oc ? *oc : cursor;
+            platformCursor->changeCursor(&c, q);
+        }
+    }
+}
 #endif
 
 QT_END_NAMESPACE

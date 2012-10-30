@@ -190,7 +190,7 @@ QT_BEGIN_NAMESPACE
 */
 
 extern bool qt_sendSpontaneousEvent(QObject *, QEvent *);
-Q_WIDGETS_EXPORT extern bool qt_tab_all_widgets;
+Q_WIDGETS_EXPORT extern bool qt_tab_all_widgets();
 
 /*!
     \internal
@@ -357,7 +357,7 @@ QWidget *QGraphicsProxyWidgetPrivate::findFocusChild(QWidget *child, bool next) 
     }
 
     QWidget *oldChild = child;
-    uint focus_flag = qt_tab_all_widgets ? Qt::TabFocus : Qt::StrongFocus;
+    uint focus_flag = qt_tab_all_widgets() ? Qt::TabFocus : Qt::StrongFocus;
     do {
         if (child->isEnabled()
 	    && child->isVisibleTo(widget)
@@ -1485,17 +1485,7 @@ void QGraphicsProxyWidget::paint(QPainter *painter, const QStyleOptionGraphicsIt
     if (exposedWidgetRect.isEmpty())
         return;
 
-    // Disable QPainter's default pen being cosmetic. This allows widgets and
-    // styles to follow Qt's existing defaults without getting ugly cosmetic
-    // lines when scaled.
-    bool restore = !(painter->renderHints() & QPainter::NonCosmeticDefaultPen);
-    painter->setRenderHints(QPainter::NonCosmeticDefaultPen, true);
-
     d->widget->render(painter, exposedWidgetRect.topLeft(), exposedWidgetRect);
-
-    // Restore the render hints if necessary.
-    if (restore)
-        painter->setRenderHints(QPainter::NonCosmeticDefaultPen, false);
 }
 
 /*!

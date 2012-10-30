@@ -408,8 +408,6 @@ int QDate::daysInMonth() const
     getDateFromJulianDay(jd, &y, &m, 0);
     if (m == 2 && isLeapYear(y))
         return 29;
-    else if (m < 1 || m > 12)
-        return 0;
     else
         return monthDays[m];
 }
@@ -847,6 +845,7 @@ QString QDate::toString(const QString& format) const
 
     If \a y is in the range 0 to 99, it is interpreted as 1900 to
     1999.
+    Returns \c false if the date is invalid.
 
     Use setDate() instead.
 */
@@ -917,20 +916,9 @@ QDate QDate::addDays(qint64 ndays) const
     if (isNull())
         return QDate();
 
-    QDate d;
-    quint64 diff = 0;
-
-    // this is basically "d.jd = jd + ndays" with checks for integer overflow
-    // Due to limits on minJd() and maxJd() we know diff will never overflow
-    if (ndays >= 0)
-        diff = maxJd() - jd;
-    else
-        diff = jd - minJd();
-
-    if ((quint64)qAbs(ndays) <= diff)
-        d.jd = jd + ndays;
-
-    return d;
+    // Due to limits on minJd() and maxJd() we know that any overflow
+    // will be invalid and caught by fromJulianDay().
+    return fromJulianDay(jd + ndays);
 }
 
 /*!
@@ -1160,9 +1148,10 @@ QDate QDate::fromString(const QString& s, Qt::DateFormat f)
                     break;
                 }
             }
-        }
-        if (month < 1 || month > 12) {
-            return QDate();
+            if (month == -1) {
+                // Month name matches neither English nor other localised name.
+                return QDate();
+            }
         }
 
         bool ok;
@@ -1815,7 +1804,7 @@ QTime fromStringImpl(const QString &s, Qt::DateFormat f, bool &isMidnight24)
             if (s.size() == 5) {
                 // Do not need to specify seconds if using ISO format.
                 return QTime(hour, minute, 0, 0);
-            } else if ((s.size() > 6 && s[5] == QLatin1Char(',')) || s[5] == QLatin1Char('.')) {
+            } else if ((s.size() > 6) && (s[5] == QLatin1Char(',') || s[5] == QLatin1Char('.'))) {
                 // Possibly specifying fraction of a minute.
 
                 // We only want 5 digits worth of fraction of minute. This follows the existing
@@ -2429,7 +2418,7 @@ void QDateTime::setMSecsSinceEpoch(qint64 msecs)
 
     QDateTimePrivate::Spec oldSpec = d->spec;
 
-    int ddays = msecs / MSECS_PER_DAY;
+    qint64 ddays = msecs / MSECS_PER_DAY;
     msecs %= MSECS_PER_DAY;
     if (msecs < 0) {
         // negative
@@ -2703,6 +2692,9 @@ QDateTime QDateTime::addYears(int nyears) const
 
 QDateTime QDateTimePrivate::addMSecs(const QDateTime &dt, qint64 msecs)
 {
+    if (!dt.isValid())
+        return QDateTime();
+
     QDate utcDate;
     QTime utcTime;
     dt.d->getUTC(utcDate, utcTime);
@@ -2753,18 +2745,22 @@ void QDateTimePrivate::addMSecs(QDate &utcDate, QTime &utcTime, qint64 msecs)
     later than the datetime of this object (or earlier if \a s is
     negative).
 
+    If this datetime is invalid, an invalid datetime will be returned.
+
     \sa addMSecs(), secsTo(), addDays(), addMonths(), addYears()
 */
 
-QDateTime QDateTime::addSecs(int s) const
+QDateTime QDateTime::addSecs(qint64 s) const
 {
-    return d->addMSecs(*this, qint64(s) * 1000);
+    return d->addMSecs(*this, s * 1000);
 }
 
 /*!
     Returns a QDateTime object containing a datetime \a msecs miliseconds
     later than the datetime of this object (or earlier if \a msecs is
     negative).
+
+    If this datetime is invalid, an invalid datetime will be returned.
 
     \sa addSecs(), msecsTo(), addDays(), addMonths(), addYears()
 */
@@ -2811,7 +2807,7 @@ qint64 QDateTime::daysTo(const QDateTime &other) const
     \sa addSecs(), daysTo(), QTime::secsTo()
 */
 
-int QDateTime::secsTo(const QDateTime &other) const
+qint64 QDateTime::secsTo(const QDateTime &other) const
 {
     if (!isValid() || !other.isValid())
         return 0;
@@ -3747,7 +3743,8 @@ static bool hasUnquotedAP(const QString &f)
     for (int i=0; i<max; ++i) {
         if (f.at(i) == quote) {
             inquote = !inquote;
-        } else if (!inquote && f.at(i).toUpper() == QLatin1Char('A')) {
+        } else if (!inquote && f.at(i).toUpper() == QLatin1Char('A')
+            && i + 1 < max && f.at(i + 1).toUpper() == QLatin1Char('P')) {
             return true;
         }
     }

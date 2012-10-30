@@ -238,7 +238,7 @@ QString Location::fileName() const
  */
 QString Location::canonicalRelativePath(const QString &path) const
 {
-    QDir configFileDir(QFileInfo(filePath()).dir());
+    QDir configFileDir(QDir::current());
     QDir dir(path);
     const QString canon = dir.canonicalPath();
     return configFileDir.relativeFilePath(canon);
@@ -360,7 +360,9 @@ void Location::emitMessage(MessageType type,
         result += "\n[" + details + QLatin1Char(']');
     result.replace("\n", "\n    ");
     if (type == Error)
-        result.prepend(tr("error: "));
+        result.prepend(tr(": error: "));
+    else if (type == Warning)
+        result.prepend(tr(": warning: "));
     result.prepend(toString());
     fprintf(stderr, "%s\n", result.toLatin1().data());
     fflush(stderr);
@@ -397,7 +399,6 @@ QString Location::toString() const
         }
         str += top();
     }
-    str += QLatin1String(": ");
     return str;
 }
 

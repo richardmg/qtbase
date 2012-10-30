@@ -117,7 +117,9 @@ private slots:
     void fromStringDateFormat();
     void fromStringStringFormat_data();
     void fromStringStringFormat();
+#ifdef Q_OS_WIN
     void fromString_LOCALE_ILDATE();
+#endif
     void fromStringToStringLocale_data();
     void fromStringToStringLocale();
 
@@ -726,6 +728,8 @@ void tst_QDateTime::addSecs_data()
     QTest::newRow("toPositive") << QDateTime(QDate(-1, 12, 31), QTime(23, 59, 59), Qt::UTC)
                                 << 1
                                 << QDateTime(QDate(1, 1, 1), QTime(0, 0, 0), Qt::UTC);
+
+    QTest::newRow("invalid") << invalidDateTime() << 1 << invalidDateTime();
 }
 
 void tst_QDateTime::addSecs()
@@ -913,17 +917,22 @@ void tst_QDateTime::secsTo()
     QFETCH(int, nsecs);
     QFETCH(QDateTime, result);
 
-#ifdef Q_OS_IRIX
-    QEXPECT_FAIL("cet4", "IRIX databases say 1970 had DST", Abort);
-#endif
-    QCOMPARE(dt.secsTo(result), nsecs);
-    QCOMPARE(result.secsTo(dt), -nsecs);
-    QVERIFY((dt == result) == (0 == nsecs));
-    QVERIFY((dt != result) == (0 != nsecs));
-    QVERIFY((dt < result) == (0 < nsecs));
-    QVERIFY((dt <= result) == (0 <= nsecs));
-    QVERIFY((dt > result) == (0 > nsecs));
-    QVERIFY((dt >= result) == (0 >= nsecs));
+    if (dt.isValid()) {
+    #ifdef Q_OS_IRIX
+        QEXPECT_FAIL("cet4", "IRIX databases say 1970 had DST", Abort);
+    #endif
+        QCOMPARE(dt.secsTo(result), (qint64)nsecs);
+        QCOMPARE(result.secsTo(dt), (qint64)-nsecs);
+        QVERIFY((dt == result) == (0 == nsecs));
+        QVERIFY((dt != result) == (0 != nsecs));
+        QVERIFY((dt < result) == (0 < nsecs));
+        QVERIFY((dt <= result) == (0 <= nsecs));
+        QVERIFY((dt > result) == (0 > nsecs));
+        QVERIFY((dt >= result) == (0 >= nsecs));
+    } else {
+        QVERIFY(dt.secsTo(result) == 0);
+        QVERIFY(result.secsTo(dt) == 0);
+    }
 }
 
 void tst_QDateTime::msecsTo_data()
@@ -937,17 +946,22 @@ void tst_QDateTime::msecsTo()
     QFETCH(int, nsecs);
     QFETCH(QDateTime, result);
 
-#ifdef Q_OS_IRIX
-    QEXPECT_FAIL("cet4", "IRIX databases say 1970 had DST", Abort);
-#endif
-    QCOMPARE(dt.msecsTo(result), qint64(nsecs) * 1000);
-    QCOMPARE(result.msecsTo(dt), -qint64(nsecs) * 1000);
-    QVERIFY((dt == result) == (0 == (qint64(nsecs) * 1000)));
-    QVERIFY((dt != result) == (0 != (qint64(nsecs) * 1000)));
-    QVERIFY((dt < result) == (0 < (qint64(nsecs) * 1000)));
-    QVERIFY((dt <= result) == (0 <= (qint64(nsecs) * 1000)));
-    QVERIFY((dt > result) == (0 > (qint64(nsecs) * 1000)));
-    QVERIFY((dt >= result) == (0 >= (qint64(nsecs) * 1000)));
+    if (dt.isValid()) {
+    #ifdef Q_OS_IRIX
+        QEXPECT_FAIL("cet4", "IRIX databases say 1970 had DST", Abort);
+    #endif
+        QCOMPARE(dt.msecsTo(result), qint64(nsecs) * 1000);
+        QCOMPARE(result.msecsTo(dt), -qint64(nsecs) * 1000);
+        QVERIFY((dt == result) == (0 == (qint64(nsecs) * 1000)));
+        QVERIFY((dt != result) == (0 != (qint64(nsecs) * 1000)));
+        QVERIFY((dt < result) == (0 < (qint64(nsecs) * 1000)));
+        QVERIFY((dt <= result) == (0 <= (qint64(nsecs) * 1000)));
+        QVERIFY((dt > result) == (0 > (qint64(nsecs) * 1000)));
+        QVERIFY((dt >= result) == (0 >= (qint64(nsecs) * 1000)));
+    } else {
+        QVERIFY(dt.msecsTo(result) == 0);
+        QVERIFY(result.msecsTo(dt) == 0);
+    }
 }
 
 void tst_QDateTime::currentDateTime()
@@ -1338,8 +1352,6 @@ void tst_QDateTime::toString_strformat_data()
                                  << QString("d'foobar'") << QString("31foobar");
     QTest::newRow( "datetime9" ) << QDateTime(QDate(1999, 12, 31), QTime(3, 59, 59, 999))
                                  << QString("hhhhh") << QString("03033");
-    QTest::newRow( "datetime10" ) << QDateTime(QDate(1999, 12, 31), QTime(3, 59, 59, 999))
-                                 << QString("hhhhhaA") << QString("03033amAM");
     QTest::newRow( "datetime11" ) << QDateTime(QDate(1999, 12, 31), QTime(23, 59, 59, 999))
                                  << QString("HHHhhhAaAPap") << QString("23231111PMpmPMpm");
     QTest::newRow( "datetime12" ) << QDateTime(QDate(1999, 12, 31), QTime(3, 59, 59, 999))
@@ -1347,6 +1359,10 @@ void tst_QDateTime::toString_strformat_data()
     QTest::newRow( "datetime13" ) << QDateTime(QDate(1974, 12, 1), QTime(14, 14, 20))
                                  << QString("hh''mm''ss dd''MM''yyyy")
                                  << QString("14'14'20 01'12'1974");
+    QTest::newRow( "missing p and P" ) << QDateTime(QDate(1999, 12, 31), QTime(3, 59, 59, 999))
+                                 << QString("hhhhhaA") << QString("03033aA");
+    QTest::newRow( "OK A, bad P" ) << QDateTime(QDate(1999, 12, 31), QTime(0, 59, 59, 999))
+        << QString("hhAX") << QString("00AX");
 }
 
 void tst_QDateTime::toString_strformat()
@@ -1543,19 +1559,18 @@ void tst_QDateTime::fromStringStringFormat()
     QCOMPARE(dt, expected);
 }
 
+#ifdef Q_OS_WIN
+// Windows only
 void tst_QDateTime::fromString_LOCALE_ILDATE()
 {
-#ifdef Q_OS_WIN
     QString date1 = QLatin1String("Sun 1. Dec 13:02:00 1974");
     QString date2 = QLatin1String("Sun Dec 1 13:02:00 1974");
 
     QDateTime ref(QDate(1974, 12, 1), QTime(13, 2));
     QCOMPARE(ref, QDateTime::fromString(date2, Qt::TextDate));
     QCOMPARE(ref, QDateTime::fromString(date1, Qt::TextDate));
-#else
-    QSKIP("Windows only");
-#endif
 }
+#endif
 
 void tst_QDateTime::fromStringToStringLocale_data()
 {
@@ -1577,6 +1592,13 @@ void tst_QDateTime::fromStringToStringLocale()
     // obsolete
     QCOMPARE(QDateTime::fromString(dateTime.toString(Qt::SystemLocaleDate), Qt::SystemLocaleDate), dateTime);
     QCOMPARE(QDateTime::fromString(dateTime.toString(Qt::LocaleDate), Qt::LocaleDate), dateTime);
+
+    QEXPECT_FAIL("data0", "This format is apparently failing because of a bug in the datetime parser. (QTBUG-22833)", Continue);
+    QCOMPARE(QDateTime::fromString(dateTime.toString(Qt::DefaultLocaleLongDate), Qt::DefaultLocaleLongDate), dateTime);
+#ifndef Q_OS_WIN
+    QEXPECT_FAIL("data0", "This format is apparently failing because of a bug in the datetime parser. (QTBUG-22833)", Continue);
+#endif
+    QCOMPARE(QDateTime::fromString(dateTime.toString(Qt::SystemLocaleLongDate), Qt::SystemLocaleLongDate), dateTime);
 
     QLocale::setDefault(def);
 }

@@ -61,6 +61,8 @@
 
 QT_BEGIN_NAMESPACE
 
+Q_GUI_EXPORT HICON qt_pixmapToWinHICON(const QPixmap &);
+
 static QByteArray debugWinStyle(DWORD style)
 {
     QByteArray rc = "0x";
@@ -699,13 +701,15 @@ QWindowsWindow::QWindowsWindow(QWindow *aWindow, const WindowData &data) :
     m_cursor(QWindowsScreen::screenOf(aWindow)->windowsCursor()->standardWindowCursor()),
     m_dropTarget(0),
     m_savedStyle(0),
-    m_format(aWindow->format())
+    m_format(aWindow->format()),
 #ifdef QT_OPENGL_ES_2
-   , m_eglSurface(0)
+    m_eglSurface(0),
 #endif
 #ifdef Q_OS_WINCE
-  , m_previouslyHidden(false)
+    m_previouslyHidden(false),
 #endif
+    m_iconSmall(0),
+    m_iconBig(0)
 {
     if (aWindow->surfaceType() == QWindow::OpenGLSurface)
         setFlag(OpenGLSurface);
@@ -730,6 +734,7 @@ QWindowsWindow::QWindowsWindow(QWindow *aWindow, const WindowData &data) :
 QWindowsWindow::~QWindowsWindow()
 {
     destroyWindow();
+    destroyIcon();
 }
 
 void QWindowsWindow::destroyWindow()
@@ -737,10 +742,10 @@ void QWindowsWindow::destroyWindow()
     if (QWindowsContext::verboseIntegration || QWindowsContext::verboseWindows)
         qDebug() << __FUNCTION__ << this << window() << m_data.hwnd;
     if (m_data.hwnd) { // Stop event dispatching before Window is destroyed.
+        setFlag(WithinDestroy);
         if (hasMouseCapture())
             setMouseGrabEnabled(false);
         unregisterDropSite();
-        QWindowsContext::instance()->removeWindow(m_data.hwnd);
 #ifdef QT_OPENGL_ES_2
         if (m_eglSurface) {
             if (QWindowsContext::verboseGL)
@@ -760,6 +765,7 @@ void QWindowsWindow::destroyWindow()
 #endif
         if (m_data.hwnd != GetDesktopWindow())
             DestroyWindow(m_data.hwnd);
+        QWindowsContext::instance()->removeWindow(m_data.hwnd);
         m_data.hwnd = 0;
     }
 }
@@ -783,10 +789,26 @@ void QWindowsWindow::unregisterDropSite()
     }
 }
 
+// Returns topmost QWindowsWindow ancestor even if there are embedded windows in the chain.
+// Returns this window if it is the topmost ancestor.
 QWindow *QWindowsWindow::topLevelOf(QWindow *w)
 {
     while (QWindow *parent = w->parent())
         w = parent;
+
+    const QWindowsWindow *ww = static_cast<const QWindowsWindow *>(w->handle());
+
+    // In case the topmost parent is embedded, find next ancestor using native methods
+    if (ww->isEmbedded(0)) {
+        HWND parentHWND = GetAncestor(ww->handle(), GA_PARENT);
+        const HWND desktopHwnd = GetDesktopWindow();
+        const QWindowsContext *ctx = QWindowsContext::instance();
+        while (parentHWND && parentHWND != desktopHwnd) {
+            if (QWindowsWindow *ancestor = ctx->findPlatformWindow(parentHWND))
+                return topLevelOf(ancestor->window());
+            parentHWND = GetAncestor(parentHWND, GA_PARENT);
+        }
+    }
     return w;
 }
 
@@ -1054,10 +1076,9 @@ void QWindowsWindow::handleGeometryChange()
         return;
     m_data.geometry = geometry_sys();
     QPlatformWindow::setGeometry(m_data.geometry);
+    QWindowSystemInterface::handleGeometryChange(window(), m_data.geometry);
     if (testFlag(SynchronousGeometryChangeEvent))
-        QWindowSystemInterface::handleSynchronousGeometryChange(window(), m_data.geometry);
-    else
-        QWindowSystemInterface::handleGeometryChange(window(), m_data.geometry);
+        QWindowSystemInterface::flushWindowSystemEvents();
 
     if (QWindowsContext::verboseEvents || QWindowsContext::verboseWindows)
         qDebug() << __FUNCTION__ << this << window() << m_data.geometry;
@@ -1136,8 +1157,10 @@ bool QWindowsWindow::handleWmPaint(HWND hwnd, UINT message,
         if (testFlag(OpenGLDoubleBuffered))
             InvalidateRect(hwnd, 0, false);
         BeginPaint(hwnd, &ps);
-        QWindowSystemInterface::handleSynchronousExposeEvent(window(),
-                                                             QRegion(qrectFromRECT(ps.rcPaint)));
+        QWindowSystemInterface::handleExposeEvent(window(), QRegion(qrectFromRECT(ps.rcPaint)));
+        if (!QWindowsContext::instance()->asyncExpose())
+            QWindowSystemInterface::flushWindowSystemEvents();
+
         EndPaint(hwnd, &ps);
     } else {
         BeginPaint(hwnd, &ps);
@@ -1146,7 +1169,9 @@ bool QWindowsWindow::handleWmPaint(HWND hwnd, UINT message,
         if (QWindowsContext::verboseIntegration)
             qDebug() << __FUNCTION__ << this << window() << updateRect;
 
-        QWindowSystemInterface::handleSynchronousExposeEvent(window(), QRegion(updateRect));
+        QWindowSystemInterface::handleExposeEvent(window(), QRegion(updateRect));
+        if (!QWindowsContext::instance()->asyncExpose())
+            QWindowSystemInterface::flushWindowSystemEvents();
         EndPaint(hwnd, &ps);
     }
     return true;
@@ -1160,7 +1185,7 @@ void QWindowsWindow::setWindowTitle(const QString &title)
         SetWindowText(m_data.hwnd, (const wchar_t*)title.utf16());
 }
 
-Qt::WindowFlags QWindowsWindow::setWindowFlags(Qt::WindowFlags flags)
+void QWindowsWindow::setWindowFlags(Qt::WindowFlags flags)
 {
     if (QWindowsContext::verboseWindows)
         qDebug() << '>' << __FUNCTION__ << this << window() << "\n    from: "
@@ -1184,7 +1209,6 @@ Qt::WindowFlags QWindowsWindow::setWindowFlags(Qt::WindowFlags flags)
         qDebug() << '<' << __FUNCTION__ << "\n    returns: "
                  << QWindowsWindow::debugWindowFlags(m_data.flags)
                  << " geometry " << oldGeometry << "->" << newGeometry;
-    return m_data.flags;
 }
 
 QWindowsWindow::WindowData QWindowsWindow::setWindowFlags_sys(Qt::WindowFlags wt,
@@ -1213,13 +1237,12 @@ void QWindowsWindow::handleWindowStateChange(Qt::WindowState state)
     QWindowSystemInterface::handleWindowStateChanged(window(), state);
 }
 
-Qt::WindowState QWindowsWindow::setWindowState(Qt::WindowState state)
+void QWindowsWindow::setWindowState(Qt::WindowState state)
 {
     if (m_data.hwnd) {
         setWindowState_sys(state);
         m_windowState = state;
     }
-    return state;
 }
 
 bool QWindowsWindow::isFullScreen_sys() const
@@ -1307,7 +1330,8 @@ void QWindowsWindow::setWindowState_sys(Qt::WindowState newState)
             SetWindowPos(m_data.hwnd, HWND_TOP, r.left(), r.top(), r.width(), r.height(), swpf);
             if (!wasSync)
                 clearFlag(SynchronousGeometryChangeEvent);
-            QWindowSystemInterface::handleSynchronousGeometryChange(window(), r);
+            QWindowSystemInterface::handleGeometryChange(window(), r);
+            QWindowSystemInterface::flushWindowSystemEvents();
         } else if (newState != Qt::WindowMinimized) {
             // Restore saved state.
             unsigned newStyle = m_savedStyle ? m_savedStyle : style();
@@ -1734,6 +1758,34 @@ QByteArray QWindowsWindow::debugWindowFlags(Qt::WindowFlags wf)
     if (iwf & Qt::WindowCloseButtonHint) rc += " WindowCloseButtonHint";
     rc += ']';
     return rc;
+}
+
+static HICON createHIcon(const QIcon &icon, int xSize, int ySize)
+{
+    if (!icon.isNull()) {
+        const QPixmap pm = icon.pixmap(icon.actualSize(QSize(xSize, ySize)));
+        if (!pm.isNull())
+            return qt_pixmapToWinHICON(pm);
+    }
+    return 0;
+}
+
+void QWindowsWindow::setWindowIcon(const QIcon &icon)
+{
+    if (m_data.hwnd) {
+        destroyIcon();
+
+        m_iconSmall = createHIcon(icon, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+        m_iconBig = createHIcon(icon, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+
+        if (m_iconBig) {
+            SendMessage(m_data.hwnd, WM_SETICON, 0 /* ICON_SMALL */, (LPARAM)m_iconSmall);
+            SendMessage(m_data.hwnd, WM_SETICON, 1 /* ICON_BIG */, (LPARAM)m_iconBig);
+        } else {
+            SendMessage(m_data.hwnd, WM_SETICON, 0 /* ICON_SMALL */, (LPARAM)m_iconSmall);
+            SendMessage(m_data.hwnd, WM_SETICON, 1 /* ICON_BIG */, (LPARAM)m_iconSmall);
+        }
+    }
 }
 
 QT_END_NAMESPACE

@@ -43,6 +43,7 @@
 
 #include <QtCore/QVariant>
 #include <QtCore/QStringList>
+#include <QtCore/qfileinfo.h>
 #include <qpalette.h>
 #include <qtextformat.h>
 
@@ -129,6 +130,9 @@ QT_BEGIN_NAMESPACE
     \value SpellCheckUnderlineStyle (int) A QTextCharFormat::UnderlineStyle specifying
                                     the underline style used misspelled words when spell checking.
 
+    \value TabAllWidgets (bool) Whether tab navigation should go through all the widgets or components,
+                         or just through text boxes and list views. This is mostly a Mac feature.
+
     \sa themeHint(), QStyle::pixelMetric()
 */
 
@@ -159,6 +163,22 @@ const QFont *QPlatformTheme::font(Font type) const
 {
     Q_UNUSED(type)
     return 0;
+}
+
+QPixmap QPlatformTheme::standardPixmap(StandardPixmap sp, const QSizeF &size) const
+{
+    Q_UNUSED(sp);
+    Q_UNUSED(size);
+    // TODO Should return QCommonStyle pixmaps?
+    return QPixmap();
+}
+
+QPixmap QPlatformTheme::fileIconPixmap(const QFileInfo &fileInfo, const QSizeF &size) const
+{
+    Q_UNUSED(fileInfo);
+    Q_UNUSED(size);
+    // TODO Should return QCommonStyle pixmaps?
+    return QPixmap();
 }
 
 QVariant QPlatformTheme::themeHint(ThemeHint hint) const
@@ -218,6 +238,10 @@ QVariant QPlatformTheme::defaultThemeHint(ThemeHint hint)
         return QVariant(int(0));
     case SpellCheckUnderlineStyle:
         return QVariant(int(QTextCharFormat::SpellCheckUnderline));
+    case TabAllWidgets:
+        return QVariant(true);
+    case IconPixmapSizes:
+        return QVariant::fromValue(QList<int>());
     }
     return QVariant();
 }

@@ -717,8 +717,8 @@ QCoreGraphicsPaintEngine::updateState(const QPaintEngineState &state)
     if (flags & DirtyCompositionMode)
         updateCompositionMode(state.compositionMode());
 
-    if (flags & (DirtyPen | DirtyTransform)) {
-        if (!d->current.pen.isCosmetic()) {
+    if (flags & (DirtyPen | DirtyTransform | DirtyHints)) {
+        if (!qt_pen_is_cosmetic(d->current.pen, state.renderHints())) {
             d->cosmeticPen = QCoreGraphicsPaintEnginePrivate::CosmeticNone;
         } else if (d->current.transform.m11() < d->current.transform.m22()-1.0 ||
                   d->current.transform.m11() > d->current.transform.m22()+1.0) {
@@ -1022,7 +1022,8 @@ void QCoreGraphicsPaintEngine::drawPixmap(const QRectF &r, const QPixmap &pm, co
         image = qt_mac_create_imagemask(pm, sr);
     } else if (differentSize) {
         QCFType<CGImageRef> img = qt_mac_image_to_cgimage(pm.toImage());
-        image = CGImageCreateWithImageInRect(img, CGRectMake(qRound(sr.x()), qRound(sr.y()), qRound(sr.width()), qRound(sr.height())));
+        if (img)
+            image = CGImageCreateWithImageInRect(img, CGRectMake(qRound(sr.x()), qRound(sr.y()), qRound(sr.width()), qRound(sr.height())));
     } else {
         image = qt_mac_image_to_cgimage(pm.toImage());
     }

@@ -44,6 +44,7 @@
 #include "testcompiler.h"
 
 #include <QObject>
+#include <QStandardPaths>
 #include <QDir>
 
 class tst_qmake : public QObject
@@ -91,6 +92,7 @@ private slots:
     void includefunction();
     void substitutes();
     void project();
+    void proFileCache();
 
 private:
     TestCompiler test_compiler;
@@ -111,7 +113,12 @@ void tst_qmake::initTestCase()
     QString binpath = QLibraryInfo::location(QLibraryInfo::BinariesPath);
     QString cmd = QString("%1/qmake").arg(binpath);
 #ifdef Q_CC_MSVC
-    test_compiler.setBaseCommands( "nmake", cmd );
+    const QString jom = QStandardPaths::findExecutable(QLatin1String("jom.exe"));
+    if (jom.isEmpty()) {
+        test_compiler.setBaseCommands( QLatin1String("nmake"), cmd );
+    } else {
+        test_compiler.setBaseCommands( jom, cmd );
+    }
 #elif defined(Q_CC_MINGW)
     test_compiler.setBaseCommands( "mingw32-make", cmd );
 #elif defined(Q_OS_WIN) && defined(Q_CC_GNU)
@@ -538,6 +545,12 @@ void tst_qmake::project()
     QVERIFY( test_compiler.exists( workDir, "project", Exe, "" ));
     QVERIFY( test_compiler.makeDistClean( workDir ));
     QVERIFY( test_compiler.removeProject( workDir, "project" ));
+}
+
+void tst_qmake::proFileCache()
+{
+    QString workDir = base_path + "/testdata/pro_file_cache";
+    QVERIFY( test_compiler.qmake( workDir, "pro_file_cache" ));
 }
 
 QTEST_MAIN(tst_qmake)

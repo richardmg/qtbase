@@ -157,27 +157,27 @@ private:
         m_splitter->setPosition(start);
         QScriptAnalysis itemAnalysis = m_analysis[start];
 
-        if (m_splitter->boundaryReasons() & QTextBoundaryFinder::StartWord) {
+        if (m_splitter->boundaryReasons() & QTextBoundaryFinder::StartOfItem)
             itemAnalysis.flags = QScriptAnalysis::Uppercase;
-            m_splitter->toNextBoundary();
-        }
+
+        m_splitter->toNextBoundary();
 
         const int end = start + length;
         for (int i = start + 1; i < end; ++i) {
-
-            bool atWordBoundary = false;
+            bool atWordStart = false;
 
             if (i == m_splitter->position()) {
-                if (m_splitter->boundaryReasons() & QTextBoundaryFinder::StartWord
-                    && m_analysis[i].flags < QScriptAnalysis::TabOrObject)
-                    atWordBoundary = true;
+                if (m_splitter->boundaryReasons() & QTextBoundaryFinder::StartOfItem) {
+                    Q_ASSERT(m_analysis[i].flags < QScriptAnalysis::TabOrObject);
+                    atWordStart = true;
+                }
 
                 m_splitter->toNextBoundary();
             }
 
             if (m_analysis[i] == itemAnalysis
                 && m_analysis[i].flags < QScriptAnalysis::TabOrObject
-                && !atWordBoundary
+                && !atWordStart
                 && i - start < MaxItemLength)
                 continue;
 
@@ -185,7 +185,7 @@ private:
             start = i;
             itemAnalysis = m_analysis[start];
 
-            if (atWordBoundary)
+            if (atWordStart)
                 itemAnalysis.flags = QScriptAnalysis::Uppercase;
         }
         m_items.append(QScriptItem(start, itemAnalysis));
@@ -1015,10 +1015,22 @@ void QTextEngine::shapeTextWithHarfbuzz(int item) const
             casedString.resize(entire_shaper_item.item.length);
         HB_UChar16 *uc = casedString.data();
         for (uint i = 0; i < entire_shaper_item.item.length; ++i) {
-            if(si.analysis.flags == QScriptAnalysis::Lowercase)
-                uc[i] = QChar::toLower(entire_shaper_item.string[si.position + i]);
-            else
-                uc[i] = QChar::toUpper(entire_shaper_item.string[si.position + i]);
+            uint ucs4 = entire_shaper_item.string[si.position + i];
+            if (QChar::isHighSurrogate(ucs4)) {
+                uc[i] = ucs4; // high part never changes in simple casing
+                if (i + 1 < entire_shaper_item.item.length) {
+                    ushort low = entire_shaper_item.string[si.position + i + 1];
+                    if (QChar::isLowSurrogate(low)) {
+                        ucs4 = QChar::surrogateToUcs4(ucs4, low);
+                        ucs4 = si.analysis.flags == QScriptAnalysis::Lowercase ? QChar::toLower(ucs4)
+                                                                               : QChar::toUpper(ucs4);
+                        uc[++i] = QChar::lowSurrogate(ucs4);
+                    }
+                }
+            } else {
+                uc[i] = si.analysis.flags == QScriptAnalysis::Lowercase ? QChar::toLower(ucs4)
+                                                                        : QChar::toUpper(ucs4);
+            }
         }
         entire_shaper_item.item.pos = 0;
         entire_shaper_item.string = uc;
@@ -1799,7 +1811,6 @@ struct QJustificationPoint {
     int type;
     QFixed kashidaWidth;
     QGlyphLayout glyph;
-    QFontEngine *fontEngine;
 };
 
 Q_DECLARE_TYPEINFO(QJustificationPoint, Q_PRIMITIVE_TYPE);
@@ -1808,7 +1819,6 @@ static void set(QJustificationPoint *point, int type, const QGlyphLayout &glyph,
 {
     point->type = type;
     point->glyph = glyph;
-    point->fontEngine = fe;
 
     if (type >= HB_Arabic_Normal) {
         QChar ch(0x640); // Kashida character
@@ -2540,7 +2550,10 @@ namespace {
 struct QScriptItemComparator {
     bool operator()(const QScriptItem &a, const QScriptItem &b) { return a.position < b.position; }
     bool operator()(int p, const QScriptItem &b) { return p < b.position; }
-    //bool operator()(const QScriptItem &a, int p) { return a.position < p; }
+#if defined(Q_CC_MSVC) && _MSC_VER < 1600
+//The STL implementation of MSVC 2008 requires the definition
+    bool operator()(const QScriptItem &a, int p) { return a.position < p; }
+#endif
 };
 }
 
@@ -2738,13 +2751,13 @@ void QTextEngine::resolveAdditionalFormats() const
         const QScriptItem *si = &layoutData->items.at(i);
         int end = si->position + length(si);
 
-        while (startIt != addFormatSortedByStart.end() &&
+        while (startIt != addFormatSortedByStart.constEnd() &&
             specialData->addFormats.at(*startIt).start <= si->position) {
             currentFormats.insert(std::upper_bound(currentFormats.begin(), currentFormats.end(), *startIt),
                                   *startIt);
             ++startIt;
         }
-        while (endIt != addFormatSortedByEnd.end() &&
+        while (endIt != addFormatSortedByEnd.constEnd() &&
             specialData->addFormats.at(*endIt).start + specialData->addFormats.at(*endIt).length < end) {
             currentFormats.remove(qBinaryFind(currentFormats, *endIt) - currentFormats.begin());
             ++endIt;
@@ -3059,8 +3072,7 @@ void QTextEngine::drawItemDecorationList(QPainter *painter, const ItemDecoration
 
     foreach (const ItemDecoration &decoration, decorationList) {
         painter->setPen(decoration.pen);
-        QLineF line(decoration.x1, decoration.y, decoration.x2, decoration.y);
-        painter->drawLine(line);
+        painter->drawLine(QLineF(decoration.x1, decoration.y, decoration.x2, decoration.y));
     }
 }
 
@@ -3068,13 +3080,23 @@ void QTextEngine::drawDecorations(QPainter *painter)
 {
     QPen oldPen = painter->pen();
 
+    bool wasCompatiblePainting = painter->renderHints()
+            & QPainter::Qt4CompatiblePainting;
+
+    if (wasCompatiblePainting)
+        painter->setRenderHint(QPainter::Qt4CompatiblePainting, false);
+
     adjustUnderlines();
     drawItemDecorationList(painter, underlineList);
     drawItemDecorationList(painter, strikeOutList);
     drawItemDecorationList(painter, overlineList);
 
-    painter->setPen(oldPen);
     clearDecorations();
+
+    if (wasCompatiblePainting)
+        painter->setRenderHint(QPainter::Qt4CompatiblePainting);
+
+    painter->setPen(oldPen);
 }
 
 void QTextEngine::clearDecorations()
