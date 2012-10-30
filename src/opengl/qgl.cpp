@@ -4090,7 +4090,8 @@ void QGLWidget::glDraw()
 #endif
     if (!d->glcx->initialized()) {
         glInit();
-        resizeGL(d->glcx->device()->width(), d->glcx->device()->height()); // New context needs this "resize"
+        int scaleFactor = window()->windowHandle()->devicePixelRatio();
+        resizeGL(d->glcx->device()->width() * scaleFactor, d->glcx->device()->height() * scaleFactor); // New context needs this "resize"
     }
     paintGL();
     if (doubleBuffer()) {
