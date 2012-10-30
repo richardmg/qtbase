@@ -114,6 +114,10 @@ void QCocoaGLContext::setActiveWindow(QWindow *window)
     cocoaWindow->setCurrentContext(this);
 
     NSView *view = cocoaWindow->contentView();
+    static bool enableHighdpi = !qgetenv("QT_HIGHDPI_AWARE").isEmpty();
+    if (enableHighdpi)
+        [view setWantsBestResolutionOpenGLSurface:YES]; // enable high-dpi
+
     [m_context setView:view];
 }
 
