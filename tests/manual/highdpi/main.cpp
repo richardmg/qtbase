@@ -236,6 +236,24 @@ public:
     }
 };
 
+class Fonts : public QWidget
+{
+public:
+    void paintEvent(QPaintEvent *event)
+    {
+        QPainter painter(this);
+        int y = 40;
+        for (int fontSize = 2; fontSize < 18; fontSize += 2) {
+            QFont font;
+            font.setPointSize(fontSize);
+            QString string = QString(QStringLiteral("%1 The quick brown fox jumped over the lazy Doug.")).arg(fontSize);
+            painter.setFont(font);
+            painter.drawText(10, y, string);
+            y += (fontSize  * 2.5);
+        }
+    }
+};
+
 int main(int argc, char **argv)
 {
     qputenv("QT_HIGHDPI_AWARE", "1");
@@ -263,6 +281,9 @@ int main(int argc, char **argv)
 
     Style style;
     style.show();
+
+    Fonts fonts;
+//    fonts.show();
 
     return app.exec();
 }
