@@ -43,6 +43,7 @@
 #include "qcocoawindow.h"
 #include "qcocoaautoreleasepool.h"
 #include <qdebug.h>
+#include <QtOpenGL/qgl.h>
 #include <QtCore/private/qcore_mac_p.h>
 #include <QtPlatformSupport/private/cglconvenience_p.h>
 
@@ -114,6 +115,10 @@ void QCocoaGLContext::setActiveWindow(QWindow *window)
     cocoaWindow->setCurrentContext(this);
 
     NSView *view = cocoaWindow->contentView();
+    const bool enableHighdpi = format().testOption(QSurfaceFormat::HighDpi);
+    if (enableHighdpi)
+        [view setWantsBestResolutionOpenGLSurface:YES]; // enable high-dpi
+
     [m_context setView:view];
 }
 

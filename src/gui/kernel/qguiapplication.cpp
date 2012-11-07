@@ -660,7 +660,24 @@ QList<QScreen *> QGuiApplication::screens()
 
 
 /*!
-    Returns the top level window at the given position \a pos, if any.
+    Returns the highest display scale factor found on the system.
+
+    Don't use this function unless you have to. Use QScreen::devicePixelRatio()
+    instead and target a specific screen.
+
+    \sa QScreen::devicePixelRatio();
+*/
+qreal QGuiApplication::devicePixelRatio() const
+{
+    qreal topScaleFactor = 1.0;
+    foreach (QScreen *screen, QGuiApplicationPrivate::screen_list) {
+        topScaleFactor = qMax(topScaleFactor, screen->devicePixelRatio());
+    }
+    return topScaleFactor;
+}
+
+/*!
+    Returns the top level window at the given position, if any.
 */
 QWindow *QGuiApplication::topLevelAt(const QPoint &pos)
 {
@@ -1211,6 +1228,12 @@ void QGuiApplicationPrivate::processWindowSystemEvent(QWindowSystemInterfacePriv
         QGuiApplicationPrivate::processFileOpenEvent(
                     static_cast<QWindowSystemInterfacePrivate::FileOpenEvent *>(e));
         break;
+#ifndef QT_NO_CONTEXTMENU
+        case QWindowSystemInterfacePrivate::ContextMenu:
+        QGuiApplicationPrivate::processContextMenuEvent(
+                    static_cast<QWindowSystemInterfacePrivate::ContextMenuEvent *>(e));
+        break;
+#endif
     default:
         qWarning() << "Unknown user input event type:" << e->type;
         break;
@@ -1638,6 +1661,19 @@ void QGuiApplicationPrivate::processPlatformPanelEvent(QWindowSystemInterfacePri
     QEvent ev(QEvent::PlatformPanel);
     QGuiApplication::sendSpontaneousEvent(e->window.data(), &ev);
 }
+
+#ifndef QT_NO_CONTEXTMENU
+void QGuiApplicationPrivate::processContextMenuEvent(QWindowSystemInterfacePrivate::ContextMenuEvent *e)
+{
+    // Widgets do not care about mouse triggered context menu events. Also, do not forward event
+    // to a window blocked by a modal window.
+    if (!e->window || e->mouseTriggered || e->window->d_func()->blockedByModalWindow)
+        return;
+
+    QContextMenuEvent ev(QContextMenuEvent::Keyboard, e->pos, e->globalPos, e->modifiers);
+    QGuiApplication::sendSpontaneousEvent(e->window.data(), &ev);
+}
+#endif
 
 Q_GUI_EXPORT uint qHash(const QGuiApplicationPrivate::ActiveTouchPointsKey &k)
 {

@@ -161,6 +161,15 @@ QDpi QPlatformScreen::logicalDpi() const
 }
 
 /*!
+    Reimplement this function if you are writing the cocoa plugin
+    and and want to support high-dpi mode.
+*/
+qreal QPlatformScreen::devicePixelRatio() const
+{
+    return 1.0;
+}
+
+/*!
     Reimplement this function in subclass to return the vertical refresh rate
     of the screen, in Hz.
 

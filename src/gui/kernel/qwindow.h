@@ -106,6 +106,7 @@ class Q_GUI_EXPORT QWindow : public QObject, public QSurface
     Q_PROPERTY(QRect geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(bool visible READ isVisible WRITE setVisible NOTIFY visibleChanged)
     Q_PROPERTY(Qt::ScreenOrientation contentOrientation READ contentOrientation WRITE reportContentOrientationChange NOTIFY contentOrientationChanged)
+    Q_PROPERTY(qreal devicePixelRatio READ devicePixelRatio)
 #ifndef QT_NO_CURSOR
     Q_PROPERTY(QCursor cursor READ cursor WRITE setCursor RESET unsetCursor)
 #endif
@@ -151,6 +152,8 @@ public:
 
     void reportContentOrientationChange(Qt::ScreenOrientation orientation);
     Qt::ScreenOrientation contentOrientation() const;
+
+    qreal devicePixelRatio() const;
 
     bool requestWindowOrientation(Qt::ScreenOrientation orientation);
     Qt::ScreenOrientation windowOrientation() const;
@@ -219,6 +222,7 @@ public:
 
     QScreen *screen() const;
     void setScreen(QScreen *screen);
+    QScreen *virtualScreen() const;
 
     virtual QAccessibleInterface *accessibleRoot() const;
     virtual QObject *focusObject() const;

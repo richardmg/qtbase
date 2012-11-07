@@ -135,6 +135,8 @@ public:
     QImage(uchar *data, int width, int height, int bytesPerLine, Format format, QImageCleanupFunction cleanupFunction = 0, void *cleanupInfo = 0);
     QImage(const uchar *data, int width, int height, int bytesPerLine, Format format, QImageCleanupFunction cleanupFunction = 0, void *cleanupInfo = 0);
 
+    static QImage cacheImage(const QSize &pointSize, QWindow *targetWindow = 0);
+
 #ifndef QT_NO_IMAGEFORMAT_XPM
     explicit QImage(const char * const xpm[]);
 #endif
@@ -210,6 +212,9 @@ public:
 
     QVector<QRgb> colorTable() const;
     void setColorTable(const QVector<QRgb> colors);
+
+    qreal devicePixelRatio() const;
+    void setDevicePixelRatio(qreal scaleFactor);
 
     void fill(uint pixel);
     void fill(const QColor &color);

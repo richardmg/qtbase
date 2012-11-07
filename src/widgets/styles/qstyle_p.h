@@ -74,12 +74,12 @@ public:
 
 inline QImage styleCacheImage(const QSize &size)
 {
-    return QImage(size, QImage::Format_ARGB32_Premultiplied);
+    return QImage::cacheImage(size);
 }
 
 inline QPixmap styleCachePixmap(const QSize &size)
 {
-    return QPixmap(size);
+    return QPixmap::cachePixmap(size);
 }
 
 #define BEGIN_STYLE_PIXMAPCACHE(a) \

@@ -77,6 +77,7 @@ QGLFormat QGLFormat::fromSurfaceFormat(const QSurfaceFormat &format)
         retFormat.setStencil(true);
         retFormat.setStencilBufferSize(format.stencilBufferSize());
     }
+    retFormat.setOption(format.testOption(QSurfaceFormat::HighDpi) ? QGL::HighDpi : QGL::NoHighDpi);
     retFormat.setDoubleBuffer(format.swapBehavior() != QSurfaceFormat::SingleBuffer);
     retFormat.setStereo(format.stereo());
     retFormat.setVersion(format.majorVersion(), format.minorVersion());
@@ -106,6 +107,7 @@ QSurfaceFormat QGLFormat::toSurfaceFormat(const QGLFormat &format)
     if (format.stencil())
         retFormat.setStencilBufferSize(format.stencilBufferSize() == -1 ? 1 : format.stencilBufferSize());
     retFormat.setStereo(format.stereo());
+    retFormat.setHighDpi(format.testOption(QGL::HighDpi));
     retFormat.setMajorVersion(format.majorVersion());
     retFormat.setMinorVersion(format.minorVersion());
     retFormat.setProfile(static_cast<QSurfaceFormat::OpenGLContextProfile>(format.profile()));
@@ -371,7 +373,9 @@ void QGLWidget::resizeEvent(QResizeEvent *e)
     makeCurrent();
     if (!d->glcx->initialized())
         glInit();
-    resizeGL(width(), height());
+    const qreal scaleFactor = format().testOption(QGL::HighDpi) ?
+        window()->windowHandle()->devicePixelRatio() : 1.0;
+    resizeGL(width() * scaleFactor, height() * scaleFactor);
 }
 
 

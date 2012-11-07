@@ -225,6 +225,19 @@ QTransform QPainterPrivate::viewTransform() const
     return QTransform();
 }
 
+QTransform QPainterPrivate::hidpiScaleTransform() const
+{
+    extern qreal qhidpiIsEmulationGetScaleFactor();
+
+    qreal deviceScale = device->physicalDpiX() / device->logicalDpiX();
+//    qDebug() << "scales" << deviceScale << qhidpiIsEmulationGetScaleFactor();
+
+
+    if (deviceScale > 1) {
+        return QTransform::fromScale(deviceScale, deviceScale);
+    }
+    return QTransform();
+}
 
 /*
    \internal
@@ -630,7 +643,8 @@ void QPainterPrivate::drawStretchedGradient(const QPainterPath &path, DrawOperat
 
 void QPainterPrivate::updateMatrix()
 {
-    state->matrix = state->WxF ? state->worldMatrix : QTransform();
+    state->matrix = state->worldMatrix;
+
     if (state->VxF)
         state->matrix *= viewTransform();
 
@@ -640,6 +654,9 @@ void QPainterPrivate::updateMatrix()
         extended->transformChanged();
     else
         state->dirtyFlags |= QPaintEngine::DirtyTransform;
+
+    state->matrix *= hidpiScaleTransform();
+    engine->d_func()->setSystemTransform(hidpiScaleTransform()); // scale systemClip
 
 //     printf("VxF=%d, WxF=%d\n", state->VxF, state->WxF);
 //     qDebug() << " --- using matrix" << state->matrix << redirection_offset;
@@ -1814,6 +1831,8 @@ bool QPainter::begin(QPaintDevice *pd)
     }
 
     QRect systemRect = d->engine->systemRect();
+    //int scale = pd->metric(QPaintDevice::PdmPhysicalDpiX) / pd->metric(QPaintDevice::PdmDpiX);
+
     if (!systemRect.isEmpty()) {
         d->state->ww = d->state->vw = systemRect.width();
         d->state->wh = d->state->vh = systemRect.height();
@@ -1821,13 +1840,21 @@ bool QPainter::begin(QPaintDevice *pd)
         d->state->ww = d->state->vw = pd->metric(QPaintDevice::PdmWidth);
         d->state->wh = d->state->vh = pd->metric(QPaintDevice::PdmHeight);
     }
+/*
+    qDebug() << "systemRect" << systemRect;
+    qDebug() << "window" << d->state->ww << d->state->wh;
+    qDebug() << "view" << d->state->vw << d->state->vh;
+    qDebug() << "metric: Pdm" << pd->metric(QPaintDevice::PdmWidth) << pd->metric(QPaintDevice::PdmHeight);
+    qDebug() << "metric: DPI" << pd->metric(QPaintDevice::PdmDpiX) << pd->metric(QPaintDevice::PdmPhysicalDpiX);
+*/
 
     const QPoint coordinateOffset = d->engine->coordinateOffset();
     d->state->redirectionMatrix.translate(-coordinateOffset.x(), -coordinateOffset.y());
 
     Q_ASSERT(d->engine->isActive());
 
-    if (!d->state->redirectionMatrix.isIdentity())
+    bool ishidpi = true; // ###
+    if (!d->state->redirectionMatrix.isIdentity() || ishidpi)
         d->updateMatrix();
 
     Q_ASSERT(d->engine->isActive());
@@ -5092,7 +5119,8 @@ void QPainter::drawPixmap(const QPointF &p, const QPixmap &pm)
             x += d->state->matrix.dx();
             y += d->state->matrix.dy();
         }
-        d->engine->drawPixmap(QRectF(x, y, w, h), pm, QRectF(0, 0, w, h));
+        int scale = pm.devicePixelRatio();
+        d->engine->drawPixmap(QRectF(x, y, w / scale, h / scale), pm, QRectF(0, 0, w, h));
     }
 }
 
@@ -5122,6 +5150,11 @@ void QPainter::drawPixmap(const QRectF &r, const QPixmap &pm, const QRectF &sr)
     qreal sw = sr.width();
     qreal sh = sr.height();
 
+    // Get pixmap scale. Use it when calculating the target
+    // rect size from pixmap size. For example, a 2X 64x64 pixel
+    // pixmap should result in a 32x32 point target rect.
+    const qreal pmscale = pm.devicePixelRatio();
+
     // Sanity-check clipping
     if (sw <= 0)
         sw = pm.width() - sx;
@@ -5130,9 +5163,9 @@ void QPainter::drawPixmap(const QRectF &r, const QPixmap &pm, const QRectF &sr)
         sh = pm.height() - sy;
 
     if (w < 0)
-        w = sw;
+        w = sw / pmscale;
     if (h < 0)
-        h = sh;
+        h = sh / pmscale;
 
     if (sx < 0) {
         qreal w_ratio = sx * w/sw;
@@ -5345,6 +5378,7 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
 
     int w = image.width();
     int h = image.height();
+    qreal scale = image.devicePixelRatio();
 
     d->updateState(d->state);
 
@@ -5368,8 +5402,7 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
         setBrush(brush);
         setPen(Qt::NoPen);
         setBrushOrigin(QPointF(0, 0));
-
-        drawRect(image.rect());
+        drawRect(QRect(QPoint(0, 0), image.size() / scale));
         restore();
         return;
     }
@@ -5380,7 +5413,7 @@ void QPainter::drawImage(const QPointF &p, const QImage &image)
         y += d->state->matrix.dy();
     }
 
-    d->engine->drawImage(QRectF(x, y, w, h), image, QRectF(0, 0, w, h), Qt::AutoColor);
+    d->engine->drawImage(QRectF(x, y, w / scale, h / scale), image, QRectF(0, 0, w, h), Qt::AutoColor);
 }
 
 void QPainter::drawImage(const QRectF &targetRect, const QImage &image, const QRectF &sourceRect,
@@ -5399,6 +5432,7 @@ void QPainter::drawImage(const QRectF &targetRect, const QImage &image, const QR
     qreal sy = sourceRect.y();
     qreal sw = sourceRect.width();
     qreal sh = sourceRect.height();
+    qreal imageScale = image.devicePixelRatio();
 
     // Sanity-check clipping
     if (sw <= 0)
@@ -5408,9 +5442,9 @@ void QPainter::drawImage(const QRectF &targetRect, const QImage &image, const QR
         sh = image.height() - sy;
 
     if (w < 0)
-        w = sw;
+        w = sw / imageScale;
     if (h < 0)
-        h = sh;
+        h = sh / imageScale;
 
     if (sx < 0) {
         qreal w_ratio = sx * w/sw;
@@ -6182,10 +6216,16 @@ static void drawTextItemDecoration(QPainter *painter, const QPointF &pos, const 
 
     QLineF line(pos.x(), pos.y(), pos.x() + qFloor(width), pos.y());
 
+    bool wasCompatiblePainting = painter->renderHints()
+            & QPainter::Qt4CompatiblePainting;
+
+    if (wasCompatiblePainting)
+        painter->setRenderHint(QPainter::Qt4CompatiblePainting, false);
+
     const qreal underlineOffset = fe->underlinePosition().toReal();
     // deliberately ceil the offset to avoid the underline coming too close to
     // the text above it.
-    const qreal underlinePos = pos.y() + qCeil(underlineOffset);
+    const qreal underlinePos = pos.y() + qCeil(underlineOffset) + 0.5;
 
     if (underlineStyle == QTextCharFormat::SpellCheckUnderline) {
         QPlatformTheme *theme = QGuiApplicationPrivate::platformTheme();
@@ -6247,6 +6287,9 @@ static void drawTextItemDecoration(QPainter *painter, const QPointF &pos, const 
 
     painter->setPen(oldPen);
     painter->setBrush(oldBrush);
+
+    if (wasCompatiblePainting)
+        painter->setRenderHint(QPainter::Qt4CompatiblePainting);
 }
 
 Q_GUI_EXPORT void qt_draw_decoration_for_glyphs(QPainter *painter, const glyph_t *glyphArray,
@@ -7500,36 +7543,16 @@ start_lengthVariant:
 
     qreal yoff = 0;
     qreal xoff = 0;
-    if (tf & Qt::AlignBottom) {
+    if (tf & Qt::AlignBottom)
         yoff = r.height() - height;
-    } else if (tf & Qt::AlignVCenter) {
+    else if (tf & Qt::AlignVCenter)
         yoff = (r.height() - height)/2;
-        if (painter) {
-            QTransform::TransformationType type = painter->transform().type();
-            if (type <= QTransform::TxScale) {
-                // do the rounding manually to work around inconsistencies
-                // in the paint engines when drawing on floating point offsets
-                const qreal scale = painter->transform().m22();
-                if (scale != 0)
-                    yoff = -qRound(-yoff * scale) / scale;
-            }
-        }
-    }
-    if (tf & Qt::AlignRight) {
+
+    if (tf & Qt::AlignRight)
         xoff = r.width() - width;
-    } else if (tf & Qt::AlignHCenter) {
+    else if (tf & Qt::AlignHCenter)
         xoff = (r.width() - width)/2;
-        if (painter) {
-            QTransform::TransformationType type = painter->transform().type();
-            if (type <= QTransform::TxScale) {
-                // do the rounding manually to work around inconsistencies
-                // in the paint engines when drawing on floating point offsets
-                const qreal scale = painter->transform().m11();
-                if (scale != 0)
-                    xoff = qRound(xoff * scale) / scale;
-            }
-        }
-    }
+
     QRectF bounds = QRectF(r.x() + xoff, r.y() + yoff, width, height);
 
     if (hasMoreLengthVariants && !(tf & Qt::TextLongestVariant) && !r.contains(bounds)) {
@@ -8243,7 +8266,7 @@ QTransform QPainter::combinedTransform() const
         qWarning("QPainter::combinedTransform: Painter not active");
         return QTransform();
     }
-    return d->state->worldMatrix * d->viewTransform();
+    return d->state->worldMatrix * d->viewTransform() * d->hidpiScaleTransform();
 }
 
 /*!

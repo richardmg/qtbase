@@ -57,6 +57,7 @@
 #include <qdebug.h>
 #include <qpainter.h>
 #include <qscreen.h>
+#include <QtGui/private/qemulatedhidpi_p.h>
 
 #include <algorithm>
 QT_BEGIN_NAMESPACE
@@ -262,11 +263,14 @@ QXcbBackingStore::~QXcbBackingStore()
 
 QPaintDevice *QXcbBackingStore::paintDevice()
 {
-    return m_image->image();
+    return m_image ? m_image->image() : 0;
 }
 
 void QXcbBackingStore::beginPaint(const QRegion &region)
 {
+    if (!m_image)
+        return;
+
     m_image->preparePaint(region);
 
 #if 0
@@ -294,7 +298,7 @@ void QXcbBackingStore::flush(QWindow *window, const QRegion &region, const QPoin
     QSize imageSize = m_image->size();
 
     QRegion clipped = region;
-    clipped &= QRect(0, 0, window->width(), window->height());
+    clipped &= qhidpiPointToPixel(QRect(0, 0, window->width(), window->height()));
     clipped &= QRect(0, 0, imageSize.width(), imageSize.height()).translated(-offset);
 
     QRect bounds = clipped.boundingRect();

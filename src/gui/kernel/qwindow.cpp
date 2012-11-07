@@ -53,6 +53,7 @@
 #include "qwindow_p.h"
 #include "qguiapplication_p.h"
 #include "qaccessible.h"
+#include "qemulatedhidpi_p.h"
 
 #include <private/qevent_p.h>
 
@@ -799,6 +800,17 @@ Qt::ScreenOrientation QWindow::windowOrientation() const
 }
 
 /*!
+    Returns the DPI scale factor for the window's backing store.
+*/
+qreal QWindow::devicePixelRatio() const
+{
+    Q_D(const QWindow);
+    if (!d->platformWindow)
+        return 1.0;
+    return d->platformWindow->devicePixelRatio() * qhidpiIsEmulationGetScaleFactor();
+}
+
+/*!
     Returns the window state.
 
     \sa setWindowState()
@@ -1022,7 +1034,7 @@ void QWindow::setGeometry(const QRect &rect)
 
     d->positionPolicy = QWindowPrivate::WindowFrameExclusive;
     if (d->platformWindow) {
-        d->platformWindow->setGeometry(rect);
+        d->platformWindow->setGeometry(qhidpiPointToPixel(rect));
     } else {
         d->geometry = rect;
     }
@@ -1066,7 +1078,7 @@ QRect QWindow::geometry() const
 {
     Q_D(const QWindow);
     if (d->platformWindow)
-        return d->platformWindow->geometry();
+        return qhidpiPixelToPoint(d->platformWindow->geometry());
     return d->geometry;
 }
 
@@ -1079,7 +1091,7 @@ QMargins QWindow::frameMargins() const
 {
     Q_D(const QWindow);
     if (d->platformWindow)
-        return d->platformWindow->frameMargins();
+        return qhidpiPixelToPoint(d->platformWindow->frameMargins());
     return QMargins();
 }
 
@@ -1093,7 +1105,7 @@ QRect QWindow::frameGeometry() const
     Q_D(const QWindow);
     if (d->platformWindow) {
         QMargins m = frameMargins();
-        return d->platformWindow->geometry().adjusted(-m.left(), -m.top(), m.right(), m.bottom());
+        return qhidpiPixelToPoint(d->platformWindow->geometry()).adjusted(-m.left(), -m.top(), m.right(), m.bottom());
     }
     return d->geometry;
 }
@@ -1110,7 +1122,7 @@ QPoint QWindow::framePos() const
     Q_D(const QWindow);
     if (d->platformWindow) {
         QMargins margins = frameMargins();
-        return d->platformWindow->geometry().topLeft() - QPoint(margins.left(), margins.top());
+        return qhidpiPixelToPoint(d->platformWindow->geometry().topLeft()) - QPoint(margins.left(), margins.top());
     }
     return d->geometry.topLeft();
 }
@@ -1125,7 +1137,7 @@ void QWindow::setFramePos(const QPoint &point)
     Q_D(QWindow);
     d->positionPolicy = QWindowPrivate::WindowFrameInclusive;
     if (d->platformWindow) {
-        d->platformWindow->setGeometry(QRect(point, size()));
+        d->platformWindow->setGeometry(qhidpiPointToPixel(QRect(point, size())));
     } else {
         d->geometry.setTopLeft(point);
     }
@@ -1165,7 +1177,7 @@ void QWindow::resize(const QSize &newSize)
 {
     Q_D(QWindow);
     if (d->platformWindow) {
-        d->platformWindow->setGeometry(QRect(pos(), newSize));
+        d->platformWindow->setGeometry(qhidpiPointToPixel(QRect(pos(), newSize)));
     } else {
         d->geometry.setSize(newSize);
     }
@@ -1275,7 +1287,7 @@ QScreen *QWindow::screen() const
     Note that if the screen is part of a virtual desktop of multiple screens,
     the window can appear on any of the screens returned by QScreen::virtualSiblings().
 
-    \sa screen(), QScreen::virtualSiblings()
+    \sa screen(), QScreen::virtualSiblings(), virtualScreen()
 */
 void QWindow::setScreen(QScreen *newScreen)
 {
@@ -1296,6 +1308,21 @@ void QWindow::setScreen(QScreen *newScreen)
         }
         emit screenChanged(newScreen);
     }
+}
+
+/*!
+    Returns the screen on which the window is shown.
+
+    The value returned will change when the window is moved
+    between virtual screens (as returned by QScreen::virtualSiblings()).
+
+    \sa screen(), QScreen::virtualSiblings()
+*/
+QScreen *QWindow::virtualScreen() const
+{
+    Q_D(const QWindow);
+    //   QPlatformWindow->QPlatformScreen->QScreen
+    return d->platformWindow->virtualScreen()->screen();
 }
 
 void QWindow::screenDestroyed(QObject *object)

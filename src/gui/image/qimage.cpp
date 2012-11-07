@@ -95,12 +95,15 @@ static QImage rotated270(const QImage &src);
 QBasicAtomicInt qimage_serial_number = Q_BASIC_ATOMIC_INITIALIZER(1);
 
 QImageData::QImageData()
-    : ref(0), width(0), height(0), depth(0), nbytes(0), data(0),
+    : ref(0), width(0), height(0), depth(0), nbytes(0), devicePixelRatio(1.0), data(0),
       format(QImage::Format_ARGB32), bytes_per_line(0),
       ser_no(qimage_serial_number.fetchAndAddRelaxed(1)),
       detach_no(0),
+      ldpmx(qt_defaultDpiX() * 100 / qreal(2.54)),
+      ldpmy(qt_defaultDpiY() * 100 / qreal(2.54)),
       dpmx(qt_defaultDpiX() * 100 / qreal(2.54)),
       dpmy(qt_defaultDpiY() * 100 / qreal(2.54)),
+
       offset(0, 0), own_data(true), ro_data(false), has_alpha_clut(false),
       is_cached(false), is_locked(false), cleanupFunction(0), cleanupInfo(0),
       paintEngine(0)
@@ -759,6 +762,14 @@ QImage::QImage(const QSize &size, Format format)
 }
 
 
+QImage QImage::cacheImage(const QSize &pointSize, QWindow *targetWindow)
+{
+    qreal actualScaleFactor = targetWindow ? targetWindow->devicePixelRatio() : qApp->devicePixelRatio();
+    QImage cache = QImage(pointSize * actualScaleFactor, QImage::Format_ARGB32_Premultiplied);
+    cache.setDevicePixelRatio(actualScaleFactor);
+    return cache;
+}
+
 
 QImageData *QImageData::create(uchar *data, int width, int height,  int bpl, QImage::Format format, bool readOnly, QImageCleanupFunction cleanupFunction, void *cleanupInfo)
 {
@@ -1216,6 +1227,7 @@ QImage QImage::copy(const QRect& r) const
 
     image.d->dpmx = dotsPerMeterX();
     image.d->dpmy = dotsPerMeterY();
+    image.d->devicePixelRatio = devicePixelRatio();
     image.d->offset = offset();
     image.d->has_alpha_clut = d->has_alpha_clut;
     image.d->text = d->text;
@@ -1367,6 +1379,51 @@ void QImage::setColorTable(const QVector<QRgb> colors)
 QVector<QRgb> QImage::colorTable() const
 {
     return d ? d->colortable : QVector<QRgb>();
+}
+
+/*!
+    Returns the current dpi scale factor for the image.
+
+    Common values for the scale factor is 1.0 (the default),
+    and 2.0 for images intended for display on High DPI displays.
+
+    Use this function when calculating layouts based on the
+    image size. Layout size is pixel size divided by the scale
+    factor.
+
+    \sa setScaleFactor()
+*/
+qreal QImage::devicePixelRatio() const
+{
+    if (!d)
+        return 1.0;
+    return d->devicePixelRatio;
+}
+
+/*!
+    Sets the dpi scale factor for the image.
+
+    The scale factor is typically set to 2.0 when producing
+    images for high-dpi displays. This informs layout code
+    paths in Qt which use the image size that the image is
+    a high-resolution image, and not a large image.
+
+    Qt supports using the "@2x" suffix when loading
+    images from files. Loading "myicon@2x.png" will result
+    in an image with a 2x scale factor.
+
+    Setting the scale factor will also change the dpi information
+    returned by QPaindevice::metric(): Physical dpi will logical dpi
+    multiplied by the scale factor.
+
+    \sa scaleFactor()
+*/
+void QImage::setDevicePixelRatio(qreal scaleFactor)
+{
+    if (!d)
+        return;
+    detach();
+    d->devicePixelRatio = scaleFactor;
 }
 
 /*!
@@ -3359,6 +3416,7 @@ QImage QImage::convertToFormat(Format format, Qt::ImageConversionFlags flags) co
 
         image.setDotsPerMeterY(dotsPerMeterY());
         image.setDotsPerMeterX(dotsPerMeterX());
+        image.setDevicePixelRatio(devicePixelRatio());
 
         image.d->text = d->text;
 
@@ -3479,6 +3537,7 @@ QImage QImage::convertToFormat(Format format, const QVector<QRgb> &colorTable, Q
 
     QImage image(d->width, d->height, format);
     QIMAGE_SANITYCHECK_MEMORY(image);
+    image.setDevicePixelRatio(devicePixelRatio());
 
     image.d->text = d->text;
 
@@ -4915,44 +4974,37 @@ int QImage::metric(PaintDeviceMetric metric) const
     switch (metric) {
     case PdmWidth:
         return d->width;
-        break;
 
     case PdmHeight:
         return d->height;
-        break;
 
     case PdmWidthMM:
         return qRound(d->width * 1000 / d->dpmx);
-        break;
 
     case PdmHeightMM:
         return qRound(d->height * 1000 / d->dpmy);
-        break;
 
     case PdmNumColors:
         return d->colortable.size();
-        break;
 
     case PdmDepth:
         return d->depth;
-        break;
 
     case PdmDpiX:
-        return qRound(d->dpmx * 0.0254);
+        return qRound(d->ldpmx * 0.0254);
         break;
 
     case PdmDpiY:
-        return qRound(d->dpmy * 0.0254);
+        return qRound(d->ldpmy * 0.0254);
         break;
 
     case PdmPhysicalDpiX:
-        return qRound(d->dpmx * 0.0254);
+        return qRound(d->dpmx * 0.0254 * d->devicePixelRatio);
         break;
 
     case PdmPhysicalDpiY:
-        return qRound(d->dpmy * 0.0254);
+        return qRound(d->dpmy * 0.0254 * d->devicePixelRatio);
         break;
-
     default:
         qWarning("QImage::metric(): Unhandled metric type %d", metric);
         break;
@@ -5651,6 +5703,7 @@ QImage QImage::transformed(const QTransform &matrix, Qt::TransformationMode mode
 
     dImage.d->dpmx = dotsPerMeterX();
     dImage.d->dpmy = dotsPerMeterY();
+    dImage.d->devicePixelRatio = devicePixelRatio();
 
     switch (bpp) {
         // initizialize the data

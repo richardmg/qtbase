@@ -200,7 +200,11 @@ bool QWidgetWindow::event(QEvent *event)
         handleTabletEvent(static_cast<QTabletEvent *>(event));
         return true;
 #endif
-
+#ifndef QT_NO_CONTEXTMENU
+    case QEvent::ContextMenu:
+        handleContextMenuEvent(static_cast<QContextMenuEvent *>(event));
+        return true;
+#endif
     default:
         break;
     }
@@ -235,9 +239,14 @@ void QWidgetWindow::handleEnterLeaveEvent(QEvent *event)
                 }
             }
         }
-        QWidget *leave = qt_last_mouse_receiver ? qt_last_mouse_receiver.data() : m_widget;
-        QApplicationPrivate::dispatchEnterLeave(enter, leave);
-        qt_last_mouse_receiver = enter;
+        // Enter-leave between sibling widgets is ignored when there is a mousegrabber - this makes
+        // both native and non-native widgets work similarly.
+        // When mousegrabbing, leaves are only generated if leaving the parent window.
+        if (!enter || !QWidget::mouseGrabber()) {
+            QWidget *leave = qt_last_mouse_receiver ? qt_last_mouse_receiver.data() : m_widget;
+            QApplicationPrivate::dispatchEnterLeave(enter, leave);
+            qt_last_mouse_receiver = enter;
+        }
     } else {
         QApplicationPrivate::dispatchEnterLeave(m_widget, 0);
         qt_last_mouse_receiver = m_widget;
@@ -617,6 +626,35 @@ void QWidgetWindow::handleTabletEvent(QTabletEvent *event)
         qt_tablet_target = 0;
 }
 #endif // QT_NO_TABLETEVENT
+
+#ifndef QT_NO_CONTEXTMENU
+void QWidgetWindow::handleContextMenuEvent(QContextMenuEvent *e)
+{
+    // We are only interested in keyboard originating context menu events here,
+    // mouse originated context menu events for widgets are generated in mouse handling methods.
+    if (e->reason() != QContextMenuEvent::Keyboard)
+        return;
+
+    QWidget *fw = QWidget::keyboardGrabber();
+    if (!fw) {
+        if (QApplication::activePopupWidget()) {
+            fw = (QApplication::activePopupWidget()->focusWidget()
+                  ? QApplication::activePopupWidget()->focusWidget()
+                  : QApplication::activePopupWidget());
+        } else if (QApplication::focusWidget()) {
+            fw = QApplication::focusWidget();
+        } else {
+            fw = m_widget;
+        }
+    }
+    if (fw && fw->isEnabled()) {
+        QPoint pos = fw->inputMethodQuery(Qt::ImMicroFocus).toRect().center();
+        QContextMenuEvent widgetEvent(QContextMenuEvent::Keyboard, pos, fw->mapToGlobal(pos),
+                                      e->modifiers());
+        QGuiApplication::sendSpontaneousEvent(fw, &widgetEvent);
+    }
+}
+#endif // QT_NO_CONTEXTMENU
 
 void QWidgetWindow::updateObjectName()
 {

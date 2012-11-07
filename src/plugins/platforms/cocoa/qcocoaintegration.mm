@@ -97,9 +97,8 @@ void QCocoaScreen::updateGeometry()
     CGDirectDisplayID dpy = [[devDesc objectForKey:@"NSScreenNumber"] unsignedIntValue];
     CGSize size = CGDisplayScreenSize(dpy);
     m_physicalSize = QSizeF(size.width, size.height);
-    NSSize resolution = [[devDesc valueForKey:NSDeviceResolution] sizeValue];
-    m_logicalDpi.first = resolution.width;
-    m_logicalDpi.second = resolution.height;
+    m_logicalDpi.first = 72;
+    m_logicalDpi.second = 72;
     m_refreshRate = CGDisplayModeGetRefreshRate(CGDisplayCopyDisplayMode(dpy));
 
     // Get m_name (brand/model of the monitor)
@@ -110,9 +109,14 @@ void QCocoaScreen::updateGeometry()
     [deviceInfo release];
 
     QWindowSystemInterface::handleScreenGeometryChange(screen(), geometry());
-    QWindowSystemInterface::handleScreenLogicalDotsPerInchChange(screen(), resolution.width, resolution.height);
+    QWindowSystemInterface::handleScreenLogicalDotsPerInchChange(screen(), m_logicalDpi.first, m_logicalDpi.second);
     QWindowSystemInterface::handleScreenRefreshRateChange(screen(), m_refreshRate);
     QWindowSystemInterface::handleScreenAvailableGeometryChange(screen(), availableGeometry());
+}
+
+qreal QCocoaScreen::devicePixelRatio() const
+{
+    return qreal([m_screen backingScaleFactor]);
 }
 
 extern CGContextRef qt_mac_cg_context(const QPaintDevice *pdev);
@@ -314,7 +318,7 @@ bool QCocoaIntegration::hasCapability(QPlatformIntegration::Capability cap) cons
 
 QPlatformWindow *QCocoaIntegration::createPlatformWindow(QWindow *window) const
 {
-    return new QCocoaWindow(window);
+    return new QCocoaWindow(window, this);
 }
 
 QPlatformOpenGLContext *QCocoaIntegration::createPlatformOpenGLContext(QOpenGLContext *context) const
@@ -387,6 +391,15 @@ QVariant QCocoaIntegration::styleHint(StyleHint hint) const
         return false;
 
     return QPlatformIntegration::styleHint(hint);
+}
+
+QPlatformScreen *QCocoaIntegration::qtForCocoaScreen(NSScreen *screen) const
+{
+    foreach (QCocoaScreen *platformScreen, mScreens) {
+        if (platformScreen->m_screen == screen)
+            return platformScreen;
+    }
+    return 0;
 }
 
 QT_END_NAMESPACE

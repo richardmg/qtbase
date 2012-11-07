@@ -4090,7 +4090,9 @@ void QGLWidget::glDraw()
 #endif
     if (!d->glcx->initialized()) {
         glInit();
-        resizeGL(d->glcx->device()->width(), d->glcx->device()->height()); // New context needs this "resize"
+        const qreal scaleFactor = format().testOption(QGL::HighDpi) ?
+            window()->windowHandle()->devicePixelRatio() : 1.0;
+        resizeGL(d->glcx->device()->width() * scaleFactor, d->glcx->device()->height() * scaleFactor); // New context needs this "resize"
     }
     paintGL();
     if (doubleBuffer()) {

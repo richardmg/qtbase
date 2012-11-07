@@ -91,6 +91,11 @@ QPlatformScreen *QPlatformWindow::screen() const
     return window()->screen()->handle();
 }
 
+QPlatformScreen *QPlatformWindow::virtualScreen() const
+{
+    return screen();
+}
+
 /*!
     Returns the actual surface format of the window.
 */
@@ -353,6 +358,11 @@ Qt::ScreenOrientation QPlatformWindow::requestWindowOrientation(Qt::ScreenOrient
 {
     Q_UNUSED(orientation);
     return Qt::PrimaryOrientation;
+}
+
+qreal QPlatformWindow::devicePixelRatio() const
+{
+    return 1.0;
 }
 
 bool QPlatformWindow::setKeyboardGrabEnabled(bool grab)
