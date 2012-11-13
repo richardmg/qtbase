@@ -7907,8 +7907,8 @@ bool QWidget::event(QEvent *event)
                 }
             }
             query->accept();
-            break;
         }
+        break;
 
     case QEvent::PolishRequest:
         ensurePolished();
@@ -8562,6 +8562,8 @@ void QWidget::focusOutEvent(QFocusEvent *)
 void QWidget::enterEvent(QEvent *)
 {
 }
+
+// ### Qt 6: void QWidget::enterEvent(QEnterEvent *).
 
 /*!
     \fn void QWidget::leaveEvent(QEvent *event)

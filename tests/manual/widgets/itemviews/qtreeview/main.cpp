@@ -3,7 +3,7 @@
 ** Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
 ** Contact: http://www.qt-project.org/legal
 **
-** This file is part of the config.tests of the Qt Toolkit.
+** This file is part of the test suite of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -39,26 +39,17 @@
 **
 ****************************************************************************/
 
-#include <xcb/xcb.h>
 
-// FIXME This workaround can be removed for xcb-icccm > 3.8
-#define class class_name
-#include <xcb/xcb_icccm.h>
-#undef class
+#include <QtWidgets/QFileSystemModel>
+#include <QtWidgets/QtWidgets>
 
-#include <xcb/xfixes.h>
-#include <xcb/xcb_image.h>
-#include <xcb/xcb_keysyms.h>
-#include <xcb/sync.h>
-#include <xcb/shm.h>
-
-int main(int, char **)
+int main(int argc, char *argv[])
 {
-    int primaryScreen = 0;
-
-    xcb_connection_t *connection = xcb_connect("", &primaryScreen);
-
-    xcb_generic_event_t *event = xcb_poll_for_queued_event(connection);
-
-    return 0;
+    QApplication app(argc, argv);
+    QFileSystemModel *model = new QFileSystemModel;
+    model->setRootPath(QDir::currentPath());
+    QTreeView *tree = new QTreeView();
+    tree->setModel(model);
+    tree->show();
+    app.exec();
 }

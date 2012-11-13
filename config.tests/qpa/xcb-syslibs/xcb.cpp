@@ -1,9 +1,9 @@
 /****************************************************************************
 **
-** Copyright (C) 2012 Klarälvdalens Datakonsult AB, a KDAB Group company, info@kdab.com, author Stephen Kelly <stephen.kelly@kdab.com>
+** Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
 ** Contact: http://www.qt-project.org/legal
 **
-** This file is part of the test suite of the Qt Toolkit.
+** This file is part of the config.tests of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -39,44 +39,28 @@
 **
 ****************************************************************************/
 
-#include <QString>
-#include <qtconcurrentiteratekernel.h>
-#include <QImage>
-#include <QHostAddress>
-#include <QGLBuffer>
-#include <QSqlQuery>
-#include <QtTest>
-#include <QWidget>
-#include <QDomDocument>
-#include <QPrintDialog>
+#include <xcb/xcb.h>
 
-#ifdef EXPECT_DBUS_AVAILABLE
-#include <QDBusMessage>
-#endif
+// FIXME This workaround can be removed for xcb-icccm > 3.8
+#define class class_name
+#include <xcb/xcb_icccm.h>
+#undef class
 
-int main(int argc, char **argv)
+#include <xcb/xfixes.h>
+#include <xcb/xcb_image.h>
+#include <xcb/xcb_keysyms.h>
+#include <xcb/sync.h>
+#include <xcb/randr.h>
+#include <xcb/shm.h>
+
+int main(int, char **)
 {
-    QObject object;
+    int primaryScreen = 0;
 
-    QtConcurrent::BlockSizeManager blockSizeManager(42);
+    xcb_connection_t *connection = xcb_connect("", &primaryScreen);
 
-    QHostAddress hostAddress;
-
-    QGLBuffer glBuffer;
-
-    QSqlQuery sqlQuery;
-
-    QSignalSpy signalSpy(&object, SIGNAL(destroyed()));
-
-    QWidget widget;
-
-    QDomDocument domDocument;
-
-    QPrintDialog printDialog;
-
-#ifdef EXPECT_DBUS_AVAILABLE
-    QDBusMessage dBusMessage;
-#endif
+    // This won't compile unless libxcb >= 1.5 which defines XCB_ATOM_PRIMARY.
+    int xcbAtomPrimary = XCB_ATOM_PRIMARY;
 
     return 0;
 }

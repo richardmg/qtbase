@@ -1081,13 +1081,9 @@ void QCommonStylePrivate::startAnimation(QStyleAnimation *animation) const
 /*! \internal */
 void QCommonStylePrivate::stopAnimation(const QObject *target) const
 {
-    QStyleAnimation *animation = animations.value(target);
-    if (animation) {
-        if (animation->state() == QAbstractAnimation::Stopped)
-            animations.take(target)->deleteLater();
-        else
-            animation->stop();
-    }
+    QStyleAnimation *animation = animations.take(target);
+    if (animation && animation->state() != QAbstractAnimation::Stopped)
+        animation->stop();
 }
 
 /*! \internal */
@@ -5019,6 +5015,9 @@ int QCommonStyle::styleHint(StyleHint sh, const QStyleOption *opt, const QWidget
         break;
     case SH_RequestSoftwareInputPanel:
         ret = RSIP_OnMouseClickAndAlreadyFocused;
+        break;
+    case SH_ScrollBar_Transient:
+        ret = false;
         break;
     default:
         ret = 0;
