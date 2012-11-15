@@ -351,13 +351,12 @@ static CGImageRef qt_mac_toCGImage(QImage *qImage, bool isMask, uchar **dataCopy
 
     CGImageRef subMask = 0;
     if (m_maskImage) {
-        subMask = CGImageCreateWithImageInRect(m_maskImage, dirtyCGRect);
-        CGContextClipToMask(cgContext, dirtyCGRect, subMask);
+        subMask = CGImageCreateWithImageInRect(m_maskImage, dirtyCGWindowRect);
+        CGContextClipToMask(cgContext, dirtyCGWindowRect, subMask);
     }
 
     CGContextRestoreGState(cgContext);
 
-    CGImageRelease(subImage);
     CGImageRelease(subMask);
 }
 
