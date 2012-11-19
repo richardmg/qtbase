@@ -108,14 +108,7 @@ static QRect fromCGRect(const CGRect &rect)
     // do not get this callback when the view just changes its position, so
     // the position of our QWindow (and platform window) will only get updated
     // when the size is also changed.
-
-    if (CGAffineTransformIsIdentity(self.transform)) {
-        // Reflect the new size (and possibly also position) in the QWindow
-        m_qioswindow->updateGeometry(fromCGRect(self.frame));
-    } else {
-        qWarning() << "QIOSPlatformWindow's UIView has transform set, ignoring geometry updates";
-    }
-
+    m_qioswindow->updateGeometry(fromCGRect(self.bounds));
     [super layoutSubviews];
 }
 
@@ -218,6 +211,8 @@ void QIOSWindow::setGeometry(const QRect &rect)
 
     // Since we don't support transformations on the UIView, we can set the frame
     // directly and let UIKit deal with translating that into bounds and center.
+    if (window()->windowState() & (Qt::WindowMaximized | Qt::WindowFullScreen))
+        return;
     m_view.frame = toCGRect(rect);
 
     updateGeometry(rect);
@@ -244,8 +239,11 @@ void QIOSWindow::setWindowState(Qt::WindowState state)
     case Qt::WindowMaximized:
     case Qt::WindowFullScreen:
         setGeometry(QRect(QPoint(0, 0), window()->screen()->availableSize()));
+        m_view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         break;
     default:
+        setGeometry(window()->geometry());
+        m_view.autoresizingMask = UIViewAutoresizingNone;
         break;
     }
 }
