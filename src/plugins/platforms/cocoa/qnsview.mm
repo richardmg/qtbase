@@ -74,7 +74,7 @@ static QTouchDevice *touchDevice = 0;
 {
     self = [super initWithFrame : NSMakeRect(0,0, 300,300)];
     if (self) {
-        m_cgImage = 0;
+        m_backingStoreCGImage = 0;
         m_maskImage = 0;
         m_maskData = 0;
         m_window = 0;
@@ -93,8 +93,8 @@ static QTouchDevice *touchDevice = 0;
 
 - (void)dealloc
 {
-    CGImageRelease(m_cgImage);
-    m_cgImage = 0;
+    CGImageRelease(m_backingStoreCGImage);
+    m_backingStoreCGImage = 0;
     CGImageRelease(m_maskImage);
     m_maskImage = 0;
     delete[] m_maskData;
@@ -211,66 +211,14 @@ static QTouchDevice *touchDevice = 0;
     }
 }
 
-static CGImageRef qt_mac_toCGImage(QImage *qImage, bool isMask, uchar **dataCopy)
+- (void) setBackingStoreCGImage:(CGImageRef)image offset:(QPoint)offset
 {
-    int width = qImage->width();
-    int height = qImage->height();
-
-    if (width <= 0 || height <= 0) {
-        qWarning() << Q_FUNC_INFO <<
-            "setting invalid size" << width << "x" << height << "for qnsview image";
-        return 0;
-    }
-
-    const uchar *imageData = qImage->bits();
-    if (dataCopy) {
-        delete[] *dataCopy;
-        *dataCopy = new uchar[qImage->byteCount()];
-        memcpy(*dataCopy, imageData, qImage->byteCount());
-    }
-    int bitDepth = qImage->depth();
-    int colorBufferSize = 8;
-    int bytesPrLine = qImage->bytesPerLine();
-
-    CGDataProviderRef cgDataProviderRef = CGDataProviderCreateWithData(
-                NULL,
-                dataCopy ? *dataCopy : imageData,
-                qImage->byteCount(),
-                NULL);
-
-    CGImageRef cgImage = 0;
-    if (isMask) {
-        cgImage = CGImageMaskCreate(width,
-                                    height,
-                                    colorBufferSize,
-                                    bitDepth,
-                                    bytesPrLine,
-                                    cgDataProviderRef,
-                                    NULL,
-                                    false);
-    } else {
-        CGColorSpaceRef cgColourSpaceRef = CGColorSpaceCreateDeviceRGB();
-        cgImage = CGImageCreate(width,
-                                height,
-                                colorBufferSize,
-                                bitDepth,
-                                bytesPrLine,
-                                cgColourSpaceRef,
-                                kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst,
-                                cgDataProviderRef,
-                                NULL,
-                                false,
-                                kCGRenderingIntentDefault);
-        CGColorSpaceRelease(cgColourSpaceRef);
-    }
-    CGDataProviderRelease(cgDataProviderRef);
-    return cgImage;
-}
-
-- (void) setImage:(QImage *)image
-{
-    CGImageRelease(m_cgImage);
-    m_cgImage = qt_mac_toCGImage(image, false, 0);
+    if (image == m_backingStoreCGImage)
+        return;
+    CGImageRetain(image);
+    CGImageRelease(m_backingStoreCGImage);
+    m_backingStoreCGImage = image;
+    m_backingStoreOffset = offset;
 }
 
 - (void) setMaskRegion:(const QRegion *)region
@@ -291,36 +239,44 @@ static CGImageRef qt_mac_toCGImage(QImage *qImage, bool isMask, uchar **dataCopy
     p.end();
 
     maskImage = maskImage.convertToFormat(QImage::Format_Indexed8);
-    m_maskImage = qt_mac_toCGImage(&maskImage, true, &m_maskData);
+    m_maskImage = qt_mac_toCGImage(maskImage, true, &m_maskData);
 }
 
 - (void) drawRect:(NSRect)dirtyRect
 {
-    if (!m_cgImage)
+    if (!m_backingStoreCGImage)
         return;
 
     CGRect dirtyCGRect = NSRectToCGRect(dirtyRect);
-
     NSGraphicsContext *nsGraphicsContext = [NSGraphicsContext currentContext];
     CGContextRef cgContext = (CGContextRef) [nsGraphicsContext graphicsPort];
 
-    CGContextSaveGState( cgContext );
+    // Translate coordiate system from CoreGraphics (bottom-left) to NSView (top-left):
+    CGContextSaveGState(cgContext);
     int dy = dirtyCGRect.origin.y + CGRectGetMaxY(dirtyCGRect);
     CGContextTranslateCTM(cgContext, 0, dy);
     CGContextScaleCTM(cgContext, 1, -1);
 
+    // If a mask is set, modify the sub image accordingly:
     CGImageRef subMask = 0;
     if (m_maskImage) {
         subMask = CGImageCreateWithImageInRect(m_maskImage, dirtyCGRect);
         CGContextClipToMask(cgContext, dirtyCGRect, subMask);
     }
 
-    CGImageRef subImage = CGImageCreateWithImageInRect(m_cgImage, dirtyCGRect);
-    CGContextDrawImage(cgContext,dirtyCGRect,subImage);
+    // Clip out and draw the correct sub image from the (shared) backingstore:
+    CGRect backingStoreRect = CGRectMake(
+        dirtyRect.origin.x + m_backingStoreOffset.x(),
+        dirtyRect.origin.y + m_backingStoreOffset.y(),
+        dirtyRect.size.width,
+        dirtyRect.size.height
+    );
+    CGImageRef subImg = CGImageCreateWithImageInRect(m_backingStoreCGImage, backingStoreRect);
+    CGContextDrawImage(cgContext, dirtyCGRect, subImg);
 
+    // Clean-up:
     CGContextRestoreGState(cgContext);
-
-    CGImageRelease(subImage);
+    CGImageRelease(subImg);
     CGImageRelease(subMask);
 }
 

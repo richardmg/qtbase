@@ -63,7 +63,9 @@ public:
     bool scroll(const QRegion &area, int dx, int dy);
 
 private:
-    QImage *m_image;
+    QImage m_qImage;
+    CGImageRef m_cgImage;
+    QSize m_requestedSize;
 };
 
 QT_END_NAMESPACE

@@ -53,7 +53,8 @@ class QCocoaWindow;
 QT_END_NAMESPACE
 
 @interface QNSView : NSView <NSTextInputClient> {
-    CGImageRef m_cgImage;
+    CGImageRef m_backingStoreCGImage;
+    QPoint m_backingStoreOffset;
     CGImageRef m_maskImage;
     uchar *m_maskData;
     QWindow *m_window;
@@ -69,7 +70,7 @@ QT_END_NAMESPACE
 - (id)init;
 - (id)initWithQWindow:(QWindow *)window platformWindow:(QCocoaWindow *) platformWindow;
 
-- (void)setImage:(QImage *)image;
+- (void)setBackingStoreCGImage:(CGImageRef)image offset:(QPoint)offset;
 - (void)setMaskRegion:(const QRegion *)region;
 - (void)drawRect:(NSRect)dirtyRect;
 - (void)updateGeometry;

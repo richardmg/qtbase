@@ -41,6 +41,7 @@
 
 #include "qcocoabackingstore.h"
 #include "qcocoaautoreleasepool.h"
+#include "qcocoahelpers.h"
 
 #include <QtCore/qdebug.h>
 #include <QtGui/QPainter>
@@ -49,45 +50,42 @@ QT_BEGIN_NAMESPACE
 
 QCocoaBackingStore::QCocoaBackingStore(QWindow *window)
     : QPlatformBackingStore(window)
+    , m_cgImage(0)
 {
-    m_image = new QImage(window->geometry().size(),QImage::Format_ARGB32_Premultiplied);
 }
 
 QCocoaBackingStore::~QCocoaBackingStore()
 {
-    delete m_image;
+    CGImageRelease(m_cgImage);
 }
 
 QPaintDevice *QCocoaBackingStore::paintDevice()
 {
-    return m_image;
+    if (m_qImage.size() != m_requestedSize) {
+        CGImageRelease(m_cgImage);
+        m_qImage = QImage(m_requestedSize, QImage::Format_ARGB32_Premultiplied);
+        m_cgImage = qt_mac_toCGImage(m_qImage, false, 0);
+    }
+    return &m_qImage;
 }
 
-void QCocoaBackingStore::flush(QWindow *widget, const QRegion &region, const QPoint &offset)
+void QCocoaBackingStore::flush(QWindow *win, const QRegion &region, const QPoint &offset)
 {
-    Q_UNUSED(widget);
     Q_UNUSED(offset);
     QCocoaAutoReleasePool pool;
 
-    QRect geo = region.boundingRect();
-    NSRect rect = NSMakeRect(geo.x(), geo.y(), geo.width(), geo.height());
-    QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window()->handle());
+    QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(win->handle());
     if (cocoaWindow) {
-        // setImage call is needed here to make the displayRect call
-        // have effect - even if the image has not changed.
-        [cocoaWindow->m_contentView setImage:m_image];
+        QRect geo = region.boundingRect();
+        NSRect rect = NSMakeRect(geo.x(), geo.y(), geo.width(), geo.height());
+        [cocoaWindow->m_contentView setBackingStoreCGImage:m_cgImage offset:offset];
         [cocoaWindow->m_contentView displayRect:rect];
    }
 }
 
 void QCocoaBackingStore::resize(const QSize &size, const QRegion &)
 {
-    delete m_image;
-    m_image = new QImage(size, QImage::Format_ARGB32_Premultiplied);
-
-    QCocoaWindow *cocoaWindow = static_cast<QCocoaWindow *>(window()->handle());
-    if (cocoaWindow)
-        [static_cast<QNSView *>(cocoaWindow->m_contentView) setImage:m_image];
+    m_requestedSize = size;
 }
 
 bool QCocoaBackingStore::scroll(const QRegion &area, int dx, int dy)
@@ -97,7 +95,7 @@ bool QCocoaBackingStore::scroll(const QRegion &area, int dx, int dy)
     const QVector<QRect> qrects = area.rects();
     for (int i = 0; i < qrects.count(); ++i) {
         const QRect &qrect = qrects.at(i);
-        qt_scrollRectInImage(*m_image, qrect, qpoint);
+        qt_scrollRectInImage(m_qImage, qrect, qpoint);
     }
     return true;
 }
