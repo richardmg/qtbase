@@ -23,3 +23,16 @@ isEmpty(QT_ARCH) {
     QMAKE_OBJECTIVE_CFLAGS += $$arch_flag
     QMAKE_LFLAGS           += $$arch_flag
 }
+
+contains(TEMPLATE, app) {
+    # We have to do the link and dependency resolution for the platform plugin
+    # manually, since QTPLUGIN and the prl lookup logic does not support
+    # the -force_load link style, which we use since we load the platform
+    # plugin from the platform plugin.
+    lib_path_and_base = $$[QT_INSTALL_PLUGINS/get]/platforms/libqios$$qtPlatformTargetSuffix()
+    LIBS += "-force_load $${lib_path_and_base}.$${QMAKE_EXTENSION_STATICLIB}"
+    LIBS += $$fromfile($${lib_path_and_base}.prl, QMAKE_PRL_LIBS)
+
+    QTPLUGIN += iosmain
+    DEFINES += main=qt_main
+}
