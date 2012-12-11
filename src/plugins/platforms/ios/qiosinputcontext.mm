@@ -39,42 +39,78 @@
 **
 ****************************************************************************/
 
-#ifndef QPLATFORMINTEGRATION_UIKIT_H
-#define QPLATFORMINTEGRATION_UIKIT_H
+#include "qiosinputcontext.h"
+#include <QDebug>
 
-#include <qpa/qplatformintegration.h>
-#include <qpa/qplatformnativeinterface.h>
+@interface QIOSKeyboardListener : NSObject {
+@public
+    QIOSInputContext *m_context;
+    BOOL m_keyboardVisible;
+}
+@end
 
-QT_BEGIN_NAMESPACE
+@implementation QIOSKeyboardListener
 
-class QIOSIntegration : public QPlatformIntegration, public QPlatformNativeInterface
+- (id)initWithQIOSInputContext:(QIOSInputContext *)context
 {
-public:
-    QIOSIntegration();
-    ~QIOSIntegration();
+    self = [super init];
+    if (self) {
+        m_context = context;
+        m_keyboardVisible = NO;
+        // After the keyboard became undockable (iOS5), UIKeyboardWillShow/UIKeyboardWillHide
+        // does no longer work for all cases. So we listen to keyboard frame changes instead:
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+            selector:@selector(keyboardDidChangeFrame:)
+            name:@"UIKeyboardDidChangeFrameNotification" object:nil];
+    }
+    return self;
+}
 
-    QPlatformWindow *createPlatformWindow(QWindow *window) const;
-    QPlatformBackingStore *createPlatformBackingStore(QWindow *window) const;
-    
-    QPlatformOpenGLContext *createPlatformOpenGLContext(QOpenGLContext *context) const;
+- (void) dealloc
+{
+    [[NSNotificationCenter defaultCenter]
+        removeObserver:self
+        name:@"UIKeyboardDidChangeFrameNotification" object:nil];
+    [super dealloc];
+}
 
-    QPlatformFontDatabase *fontDatabase() const;
-    QPlatformInputContext *inputContext() const;
-    
-    QVariant styleHint(StyleHint hint) const;
+- (void) keyboardDidChangeFrame:(NSNotification *)notification
+{
+    CGRect frame;
+    [[[notification userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&frame];
+    BOOL visible = CGRectIntersectsRect(frame, [UIScreen mainScreen].bounds);
+    if (m_keyboardVisible != visible) {
+        m_keyboardVisible = visible;
+        m_context->emitInputPanelVisibleChanged();
+    }
+        
+}
 
-    QAbstractEventDispatcher *guiThreadEventDispatcher() const;
-    QPlatformNativeInterface *nativeInterface() const;
+@end
 
-    void *nativeResourceForWindow(const QByteArray &resource, QWindow *window);
+QIOSInputContext::QIOSInputContext()
+    : QPlatformInputContext(),
+    m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
+{
+}
 
-private:
-    QPlatformFontDatabase *m_fontDatabase;
-    QPlatformInputContext *m_inputContext;
-    QPlatformScreen *m_screen;
-};
+QIOSInputContext::~QIOSInputContext()
+{
+    [m_keyboardListener release];
+}
 
-QT_END_NAMESPACE
+void QIOSInputContext::showInputPanel()
+{
+    qDebug() << __FUNCTION__ << "not implemented";
+}
 
-#endif
+void QIOSInputContext::hideInputPanel()
+{
+    qDebug() << __FUNCTION__ << "not implemented";
+}
 
+bool QIOSInputContext::isInputPanelVisible() const
+{
+    return m_keyboardListener->m_keyboardVisible;
+}
