@@ -206,8 +206,13 @@ QIOSWindow::QIOSWindow(QWindow *window)
     , m_requestedGeometry(QPlatformWindow::geometry())
     , m_glData()
 {
-    if ([[UIApplication sharedApplication].delegate isKindOfClass:[QIOSApplicationDelegate class]])
+    if ([[UIApplication sharedApplication].delegate isKindOfClass:[QIOSApplicationDelegate class]]) {
         [[UIApplication sharedApplication].delegate.window.rootViewController.view addSubview:m_view];
+        // Note: we're undermining the responder chain on iOS since Qt will anyway forward
+        // the keyevent to whichever QObject that needs it, regardless of where the key input
+        // came from. But one view needs to take on the job:
+        [m_view becomeFirstResponder];
+    }
 
     setWindowState(window->windowState());
 }
