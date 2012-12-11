@@ -40,9 +40,10 @@
 ****************************************************************************/
 
 #include "qiosinputcontext.h"
+#include <qpa/qwindowsysteminterface.h>
 #include <QDebug>
 
-@interface QIOSKeyboardListener : NSObject {
+@interface QIOSKeyboardListener : UIView <UIKeyInput> {
 @public
     QIOSInputContext *m_context;
     BOOL m_keyboardVisible;
@@ -84,7 +85,39 @@
         m_keyboardVisible = visible;
         m_context->emitInputPanelVisibleChanged();
     }
-        
+}
+
+- (BOOL)canBecomeFirstResponder
+{
+    return YES;
+}
+
+- (BOOL)hasText
+{
+    return YES;
+}
+
+- (void)insertText:(NSString *)text
+{
+    QString string = QString::fromUtf8([text UTF8String]);
+    int key = 0;
+    if ([text isEqualToString:@"\n"])
+        key = (int)Qt::Key_Return;
+
+    // Send key event to window system interface
+    QWindowSystemInterface::handleKeyEvent(
+        0, QEvent::KeyPress, key, Qt::NoModifier, string, false, int(string.length()));
+    QWindowSystemInterface::handleKeyEvent(
+        0, QEvent::KeyRelease, key, Qt::NoModifier, string, false, int(string.length()));
+}
+
+- (void)deleteBackward
+{
+    // Send key event to window system interface
+    QWindowSystemInterface::handleKeyEvent(
+        0, QEvent::KeyPress, (int)Qt::Key_Backspace, Qt::NoModifier);
+    QWindowSystemInterface::handleKeyEvent(
+        0, QEvent::KeyRelease, (int)Qt::Key_Backspace, Qt::NoModifier);
 }
 
 @end
@@ -93,6 +126,13 @@ QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext(),
     m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
 {
+    // Note: Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView
+    // the input acutually came from. So in this respect, we're undermining iOS' responder chain.
+    // Documentation specifies that one should (re)call becomeFirstResponder/resignFirstResponder to
+    // show/hide the keyboard, and since a view needs to implement the UIKeyInput protocol to receive
+    // keyevents, we create a dummy view we can use solely for this purpose. This way we can control/steal
+    // keyboard/keyinput also in the case were Qt is embedded inside a native app.
+    [[UIApplication sharedApplication].delegate.window.rootViewController.view addSubview:m_keyboardListener];
 }
 
 QIOSInputContext::~QIOSInputContext()
@@ -102,12 +142,12 @@ QIOSInputContext::~QIOSInputContext()
 
 void QIOSInputContext::showInputPanel()
 {
-    qDebug() << __FUNCTION__ << "not implemented";
+    [m_keyboardListener becomeFirstResponder];
 }
 
 void QIOSInputContext::hideInputPanel()
 {
-    qDebug() << __FUNCTION__ << "not implemented";
+    [m_keyboardListener resignFirstResponder];
 }
 
 bool QIOSInputContext::isInputPanelVisible() const

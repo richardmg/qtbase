@@ -162,39 +162,6 @@ static QRect fromCGRect(const CGRect &rect)
 @synthesize returnKeyType;
 @synthesize secureTextEntry;
 
-- (BOOL)canBecomeFirstResponder
-{
-    return YES;
-}
-
-- (BOOL)hasText
-{
-    return YES;
-}
-
-- (void)insertText:(NSString *)text
-{
-    QString string = QString::fromUtf8([text UTF8String]);
-    int key = 0;
-    if ([text isEqualToString:@"\n"])
-        key = (int)Qt::Key_Return;
-
-    // Send key event to window system interface
-    QWindowSystemInterface::handleKeyEvent(
-        0, QEvent::KeyPress, key, Qt::NoModifier, string, false, int(string.length()));
-    QWindowSystemInterface::handleKeyEvent(
-        0, QEvent::KeyRelease, key, Qt::NoModifier, string, false, int(string.length()));
-}
-
-- (void)deleteBackward
-{
-    // Send key event to window system interface
-    QWindowSystemInterface::handleKeyEvent(
-        0, QEvent::KeyPress, (int)Qt::Key_Backspace, Qt::NoModifier);
-    QWindowSystemInterface::handleKeyEvent(
-        0, QEvent::KeyRelease, (int)Qt::Key_Backspace, Qt::NoModifier);
-}
-
 @end
 
 
@@ -206,13 +173,8 @@ QIOSWindow::QIOSWindow(QWindow *window)
     , m_requestedGeometry(QPlatformWindow::geometry())
     , m_glData()
 {
-    if ([[UIApplication sharedApplication].delegate isKindOfClass:[QIOSApplicationDelegate class]]) {
+    if ([[UIApplication sharedApplication].delegate isKindOfClass:[QIOSApplicationDelegate class]])
         [[UIApplication sharedApplication].delegate.window.rootViewController.view addSubview:m_view];
-        // Note: we're undermining the responder chain on iOS since Qt will anyway forward
-        // the keyevent to whichever QObject that needs it, regardless of where the key input
-        // came from. But one view needs to take on the job:
-        [m_view becomeFirstResponder];
-    }
 
     setWindowState(window->windowState());
 }

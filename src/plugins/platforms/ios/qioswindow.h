@@ -49,7 +49,7 @@
 class QIOSContext;
 class QIOSWindow;
 
-@interface EAGLView : UIView <UIKeyInput>
+@interface EAGLView : UIView
 {
     UITextAutocapitalizationType autocapitalizationType;
     UITextAutocorrectionType autocorrectionType;
