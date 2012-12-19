@@ -80,6 +80,7 @@
 
 - (void) keyboardDidChangeFrame:(NSNotification *)notification
 {
+    qDebug() << __FUNCTION__;
     CGRect frame;
     [[[notification userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&frame];
 

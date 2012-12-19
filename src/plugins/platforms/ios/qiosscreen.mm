@@ -198,6 +198,7 @@ void QIOSScreen::setOrientationUpdateMask(Qt::ScreenOrientations mask)
     }
 }
 
+#include <QDebug>
 void QIOSScreen::setPrimaryOrientation(Qt::ScreenOrientation orientation)
 {
     // Note that UIScreen never changes orientation, but QScreen should. To work around
@@ -211,6 +212,7 @@ void QIOSScreen::setPrimaryOrientation(Qt::ScreenOrientation orientation)
     if (portrait == bool(m_geometry.width() < m_geometry.height()))
         return;
 
+    qDebug() << __FUNCTION__;
     // Switching portrait/landscape means swapping width/height (and adjusting x/y):
     m_geometry = QRect(0, 0, m_geometry.height(), m_geometry.width());
     m_physicalSize = QSizeF(m_physicalSize.height(), m_physicalSize.width());
