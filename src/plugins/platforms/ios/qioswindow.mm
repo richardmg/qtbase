@@ -128,9 +128,18 @@
     if (!CGAffineTransformIsIdentity(self.transform))
         qWarning() << m_qioswindow->window()
             << "is backed by a UIView that has a transform set. This is not supported.";
-
+    
     QRect geometry = fromCGRect(self.frame);
     m_qioswindow->QPlatformWindow::setGeometry(geometry);
+    
+    if (isQtApplication()) {
+        Qt::ScreenOrientation orientation = toQtScreenOrientation(rootViewController().interfaceOrientation);
+        if (orientation != -1) {
+            QIOSScreen *qiosScreen = static_cast<QIOSScreen *>(QGuiApplication::primaryScreen()->handle());
+            qiosScreen->setPrimaryOrientation(orientation);
+        }
+    }
+    
     QWindowSystemInterface::handleGeometryChange(m_qioswindow->window(), geometry);
 
     // If we have a new size here we need to resize the FBO's corresponding buffers,

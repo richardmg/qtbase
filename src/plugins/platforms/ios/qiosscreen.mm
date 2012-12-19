@@ -208,7 +208,7 @@ void QIOSScreen::setPrimaryOrientation(Qt::ScreenOrientation orientation)
     // We see that as acceptable since Qt should most likely not interfere with orientation
     // for that case anyway.
     bool portrait = screen()->isPortrait(orientation);
-    if (portrait && m_geometry.width() < m_geometry.height())
+    if (portrait == bool(m_geometry.width() < m_geometry.height()))
         return;
 
     // Switching portrait/landscape means swapping width/height (and adjusting x/y):

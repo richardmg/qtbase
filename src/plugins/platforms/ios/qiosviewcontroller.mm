@@ -43,8 +43,6 @@
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QScreen>
-#include "qiosscreen.h"
-#include "qiosglobal.h"
 
 @implementation QIOSViewController
 
@@ -65,17 +63,6 @@
     // We need to tell iOS that we support all orientations in order to set
     // status bar orientation when application content orientation changes.
     return UIInterfaceOrientationMaskAll;
-}
-
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
-{
-    Q_UNUSED(duration);
-    Qt::ScreenOrientation orientation = toQtScreenOrientation(toInterfaceOrientation);
-    if (orientation == -1)
-        return;
-
-    QIOSScreen *qiosScreen = static_cast<QIOSScreen *>(QGuiApplication::primaryScreen()->handle());
-    qiosScreen->setPrimaryOrientation(orientation);
 }
 
 @end
