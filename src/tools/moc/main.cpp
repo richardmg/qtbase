@@ -89,6 +89,7 @@ void error(const char *msg = "Invalid argument")
             "  -E                 preprocess only; do not generate meta object code\n"
             "  -D<macro>[=<def>]  define macro, with optional definition\n"
             "  -U<macro>          undefine macro\n"
+            "  -M<key=value>      add key/value pair to plugin meta data\n"
             "  -i                 do not generate an #include statement\n"
             "  -p<path>           path prefix for included file\n"
             "  -f[<file>]         force #include, optional file name (overwrite default)\n"
@@ -350,6 +351,33 @@ int runMoc(int _argc, char **_argv)
                 error();
             else
                 error(0); // 0 means usage only
+            break;
+        case 'M': // add meta data to plugin
+            {
+                QString string;
+                if (!more) {
+                    if (n < argc-1)
+                        string = QLatin1String(argv[++n]);
+                } else {
+                    string = QLatin1String(opt.mid(1));
+                }
+
+                int split = string.indexOf(QLatin1Char('='));
+                QString key = string.left(split);
+                QString value = string.mid(split + 1);
+
+                if (key.isEmpty() || value.isEmpty()) {
+                    error("missing meta data for argument '-M'");
+                } else if (key.indexOf(QLatin1Char('.')) != -1) {
+                    // Don't allow keys with '.' for now, since we might need this
+                    // format later for more advanced meta data API
+                    error("A key cannot contain the letter '.' for meta data argument '-M'");
+                } else {
+                    QJsonArray array = moc.metaArgs.value(key);
+                    array.append(value);
+                    moc.metaArgs.insert(key, array);
+                }
+            }
             break;
         case '-':
             if (more && arg == "--ignore-option-clashes") {
