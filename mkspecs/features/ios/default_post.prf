@@ -38,21 +38,27 @@ equals(TEMPLATE, app) {
     }
 }
 
+contains(QMAKE_MAC_SDK, ^iphonesimulator.*): \
+ 	    error("iOS simulator is handled automatically. Please choose an 'iphoneos' SDK.")
+ 	
+equals(TEMPLATE, lib):!contains(MAKEFILE_GENERATOR, XCODE): load(spliced_simulator_and_device)
+
 macx-xcode {
     ios_device_family.name = TARGETED_DEVICE_FAMILY
     ios_device_family.value = $$QMAKE_IOS_TARGETED_DEVICE_FAMILY
     QMAKE_MAC_XCODE_SETTINGS += ios_device_family
 }
 
-isEmpty(QT_ARCH) {
-    # The iPhoneOS and iPhoneSimulator targets share the same toolchain,
-    # so when configure runs the arch tests it passes the correct sysroot,
-    # but we fail to pick up the architecture since we're not passing -arch
-    # yet. Xcode does not seem to have a way to run the shared toolchain
-    # in a way that will automatically  do this (for example xcrun -sdk).
-    contains(QMAKE_MAC_SDK, iphoneos.*): QT_ARCH = arm
-    else: QT_ARCH = i386 # Simulator
-}
+iphonesimulator {
+    QT_ARCH = i386
+    QMAKE_MAC_SDK ~= s,^iphoneos,iphonesimulator,
+
+    # Since the CPU feature detection done by configure is limited to one
+    # target at the moment, we disable SIMD support for simulator.
+    CONFIG -= simd
+} else:isEmpty(QT_ARCH) {
+    QT_ARCH = arm
+ }
 
 # Be more specific about which architecture we're targeting
 equals(QT_ARCH, arm): \

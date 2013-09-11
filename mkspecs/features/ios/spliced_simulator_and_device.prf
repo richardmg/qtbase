@@ -1,0 +1,155 @@
+
+# Conceptually a Qt for iOS SDK or source build should support building
+# for both simulator and device, based on the same qmake binary and Qt
+# libraries. Qt Creator or Xcode should then be able to use the same Qt
+# version while still building for a single target at a time. This
+# applies to user libraries as well, which shouldn't require switching
+# to a different Qt when changing target platform from simulator to
+# device.
+#
+# We achieve this by using Qt's exclusive_build feature, where we build
+# for the two targets in parallel, and then use lipo to join the two
+# libraries together.
+
+# The individual slices are built by the leaf makefiles, which contain
+# the dependency information, and as the lipoing is done in the root
+# meta-makefile we need to recursivly call make, to ensure that the
+# dependency information for the final target library is re-evaluated
+# after the slices have been built by the leaf makefiles.
+
+# We add a few convenience targets to the makefile as well, such as
+# release and debug targets that build both for simulator and device,
+# and simulator and device targets, that build both debug and release.
+#
+# In addition we add a special 'build' target, that matches the default
+# build action in Xcode, and picks up the configuration and target
+# platform from the environment variables set by Xcode. This allows
+# you to build only the sub-slice that's relevant for the given
+# Xcode configuration by running 'make $ACTION' from an Xcode build
+# step.
+
+!build_pass:!prl_only {
+    # Resolve debug and release targets first
+    load(resolve_config)
+
+    builds = $$BUILDS
+    isEmpty(builds) {
+        CONFIG(debug, debug|release): builds += Debug
+        else: builds += Release
+    }
+
+    addExclusiveBuilds(iphoneos, Device, iphonesimulator, Simulator)
+
+    # We need both simulator and device
+    CONFIG += build_all
+
+    EOC = $$escape_expand(\\n\\t)
+    QMAKE_LIPO = "/usr/bin/xcrun -sdk $$QMAKE_MAC_SDK lipo"
+
+    TARGETS =
+
+    # Remove _debug suffix if present
+    TARGET ~= s,$$re_escape($$qtPlatformTargetSuffix())$,,
+
+    for(build, builds) {
+        suffix =
+        equals(build, Debug): suffix = _debug
+
+        config = $$eval($${build}.target)
+        isEmpty(config): config = $$lower($$build)
+
+        slices =
+        for(subtarget, $$list(iphoneos iphonesimulator)) {
+            slice = lib$${TARGET}_$${subtarget}$${suffix}.$${QMAKE_EXTENSION_STATICLIB}
+            dep = $${subtarget}-all
+            debug_and_release: dep ~= s,-,-$${config}-,
+
+            # Each slice also needs a target, that matches the file name of
+            # the slice itself, so that targets that depend on the slice
+            # will know how to make the slice in case it doesn't exist yet.
+            $${slice}.commands = "@$(MAKE) -f $(MAKEFILE) $$dep"
+            QMAKE_EXTRA_TARGETS += $${slice}
+
+            leaf_targets += $$dep
+            slices += $$slice
+        }
+
+        isEmpty(DESTDIR): DESTDIR = .
+
+        # We create a target for the final library that's not a dependency
+        # of any of the other targets, but depends on the two slices.
+        TARGETA = $$relative_path($$DESTDIR/lib$${TARGET}$${suffix}.$${QMAKE_EXTENSION_STATICLIB}, $$OUT_PWD)
+        $${config}_lipo.commands = "@test -d $$DESTDIR/ || $(MKDIR) $${DESTDIR}/$${EOC}"
+        $${config}_lipo.commands += "-$(DEL_FILE) $${TARGETA}$${EOC}" \
+            "$$QMAKE_LIPO -create -output $$TARGETA $$slices"
+        $${config}_lipo.target = $$TARGETA
+        $${config}_lipo.depends = $$slices
+        QMAKE_EXTRA_TARGETS += $${config}_lipo
+
+        TARGETS += $$TARGETA
+
+        # We then create a target for the current configuration, that explicitly
+        # calls make with the final library as target. This ensures that make
+        # will do the dependency resolving of the final target _after_ the two
+        # slices have been built, and hence notice they are out of date.
+        $${config}.commands = "@$(MAKE) -f $(MAKEFILE) $$TARGETA"
+        $${config}.depends = $$leaf_targets
+        QMAKE_EXTRA_TARGETS += $${config}
+
+        all.depends += $$config
+    }
+
+    # For convenience we add device/simulator targets
+    for(target, $$list(device:iphoneos simulator:iphonesimulator)) {
+        target = $$split(target, :)
+        internal_name = $$last(target)
+        target = $$first(target)
+
+        $${target}.commands = "@$(MAKE) -f $(MAKEFILE) $$TARGETS"
+        for(build, builds) {
+            dep = $${internal_name}
+            debug_and_release: dep = "$$dep-$$lower($$build)"
+            $${target}.depends += $$dep
+        }
+        QMAKE_EXTRA_TARGETS += $$target
+    }
+
+    # And a special target that allows easy building from with-in Xcode
+    build.commands += "@$(MAKE) -f $(MAKEFILE) $$TARGETS"
+    dep = "$(PLATFORM_NAME)"
+    debug_and_release: dep = "$$dep-$(shell echo $(CONFIGURATION) | tr '[:upper:]' '[:lower:]')"
+    build.depends = $$dep
+    QMAKE_EXTRA_TARGETS += build
+
+    prl.commands = "@$(QMAKE) -prl $$_PRO_FILE_ CONFIG+=prl_only"
+    prl.target = $$relative_path($$DESTDIR/lib$${TARGET}.prl, $$OUT_PWD)
+    QMAKE_EXTRA_TARGETS += prl
+
+    all.depends += prl
+    QMAKE_EXTRA_TARGETS += all
+
+} else: if(iphoneos|iphonesimulator) {
+
+    iphoneos: fixExclusiveOutputDirs(iphoneos, iphonesimulator, true)
+    iphonesimulator: fixExclusiveOutputDirs(iphonesimulator, iphoneos, true)
+
+    # Remove _debug suffix if present
+    TARGET ~= s,$$re_escape($$qtPlatformTargetSuffix())$,,
+
+    # The libraries are built into OUT_PWD, and then moved to
+    # DESTDIR, so we have to make sure they do not clash
+    iphoneos: \
+        TARGET = $${TARGET}_iphoneos
+    else:iphonesimulator: \
+        TARGET = $${TARGET}_iphonesimulator
+
+    # Add back _debug suffix
+    TARGET = $${TARGET}$$qtPlatformTargetSuffix()
+
+    # Don't copy the intermediate libs to the destination dir
+    unset(DESTDIR)
+
+    # We create prl files as a separate step
+    CONFIG -= create_prl
+}
+
