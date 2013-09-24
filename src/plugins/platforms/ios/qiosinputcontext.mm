@@ -78,15 +78,44 @@
     [super dealloc];
 }
 
+- (QRect) getKeyboardRect:(NSNotification *)notification
+{
+    // For Qt applications we rotate the keyboard rect to align with the screen
+    // orientation (which is the interface orientation of the root view controller).
+    // For hybrid apps we follow native behavior, and return the rect unmodified:
+    CGRect keyboardFrame = [[notification userInfo][UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    if (isQtApplication()) {
+        UIInterfaceOrientation orientation = [UIApplication sharedApplication].keyWindow.rootViewController.interfaceOrientation;
+        const CGSize &screenSize = [UIScreen mainScreen].bounds.size;
+
+        switch (orientation) {
+        case UIInterfaceOrientationPortraitUpsideDown:
+            return QRect(screenSize.width - keyboardFrame.origin.x - keyboardFrame.size.width,
+                         screenSize.height - keyboardFrame.origin.y - keyboardFrame.size.height,
+                         keyboardFrame.size.width, keyboardFrame.size.height);
+        case UIInterfaceOrientationLandscapeLeft:
+            return QRect(screenSize.height - keyboardFrame.origin.y - keyboardFrame.size.height,
+                         keyboardFrame.origin.x,
+                         keyboardFrame.size.height, keyboardFrame.size.width);
+        case UIInterfaceOrientationLandscapeRight:
+            return QRect(keyboardFrame.origin.y,
+                         screenSize.width - keyboardFrame.size.width - keyboardFrame.origin.x,
+                         keyboardFrame.size.height, keyboardFrame.size.width);
+        case UIInterfaceOrientationPortrait:
+        default:
+            return fromCGRect(keyboardFrame);
+        }
+    } else {
+        return fromCGRect(keyboardFrame);
+    }
+}
+
 - (void) keyboardDidChangeFrame:(NSNotification *)notification
 {
-    CGRect frame;
-    [[[notification userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&frame];
-
-    m_keyboardRect = fromPortraitToPrimary(fromCGRect(frame), QGuiApplication::primaryScreen()->handle());
+    m_keyboardRect = [self getKeyboardRect:notification];
     m_context->emitKeyboardRectChanged();
 
-    BOOL visible = CGRectIntersectsRect(frame, [UIScreen mainScreen].bounds);
+    BOOL visible = m_keyboardRect.intersects(fromCGRect([UIScreen mainScreen].bounds));
     if (m_keyboardVisible != visible) {
         m_keyboardVisible = visible;
         m_context->emitInputPanelVisibleChanged();
