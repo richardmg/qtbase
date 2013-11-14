@@ -74,6 +74,11 @@
         && [UIApplication sharedApplication].statusBarStyle == UIStatusBarStyleDefault)
         [[UIApplication sharedApplication] setStatusBarStyle:UIStatusBarStyleBlackTranslucent];
 
+    // Set a UIScrollView as root so that we can scroll the "screen" when the keyboard opens:
+    UIScrollView *scrollView = [[[UIScrollView alloc] init] autorelease];
+    self.window.rootViewController.view = scrollView;
+    scrollView.scrollEnabled = NO;
+
     self.window.hidden = NO;
 
     return YES;

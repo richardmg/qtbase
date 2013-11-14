@@ -62,6 +62,7 @@ public:
     bool isInputPanelVisible() const;
 
     void focusWindowChanged(QWindow *focusWindow);
+    void updateScrollView();
 
 private:
     QIOSKeyboardListener *m_keyboardListener;

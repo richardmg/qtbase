@@ -181,11 +181,14 @@
     QRect actualGeometry;
     if (m_qioswindow->window()->isTopLevel()) {
         UIWindow *uiWindow = self.window;
+        UIView *rootView = uiWindow.rootViewController.view;
         CGRect rootViewPositionInRelationToRootViewController =
-            [uiWindow.rootViewController.view convertRect:uiWindow.bounds fromView:uiWindow];
+            [rootView convertRect:uiWindow.bounds fromView:uiWindow];
+        qreal scrollOffset = isQtApplication() ? static_cast<UIScrollView *>(rootView).bounds.origin.y : 0;
 
-        actualGeometry = fromCGRect(CGRectOffset([self.superview convertRect:self.frame toView:uiWindow.rootViewController.view],
-            -rootViewPositionInRelationToRootViewController.origin.x, -rootViewPositionInRelationToRootViewController.origin.y));
+        actualGeometry = fromCGRect(CGRectOffset([self.superview convertRect:self.frame toView:rootView],
+                                    -rootViewPositionInRelationToRootViewController.origin.x,
+                                    -rootViewPositionInRelationToRootViewController.origin.y + scrollOffset));
     } else {
         actualGeometry = fromCGRect(self.frame);
     }
@@ -517,11 +520,14 @@ void QIOSWindow::applyGeometry(const QRect &rect)
         // Since the root-view-controller might be translated in relation to the UIWindow, we need to
         // check specifically for that and compensate.
         UIWindow *uiWindow = m_view.window;
+        UIView *rootView = uiWindow.rootViewController.view;
         CGRect rootViewPositionInRelationToRootViewController =
-            [uiWindow.rootViewController.view convertRect:uiWindow.bounds fromView:uiWindow];
+            [rootView convertRect:uiWindow.bounds fromView:uiWindow];
+        qreal scrollOffset = isQtApplication() ? static_cast<UIScrollView *>(rootView).bounds.origin.y : 0;
 
-        m_view.frame = CGRectOffset([m_view.superview convertRect:toCGRect(rect) fromView:m_view.window.rootViewController.view],
-            rootViewPositionInRelationToRootViewController.origin.x, rootViewPositionInRelationToRootViewController.origin.y);
+        m_view.frame = CGRectOffset([m_view.superview convertRect:toCGRect(rect) fromView:rootView],
+                rootViewPositionInRelationToRootViewController.origin.x,
+                rootViewPositionInRelationToRootViewController.origin.y + scrollOffset);
     } else {
         // Easy, in parent's coordinates
         m_view.frame = toCGRect(rect);
