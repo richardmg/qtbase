@@ -58,6 +58,13 @@
     self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
     self.window.rootViewController = [[[QIOSViewController alloc] init] autorelease];
 
+    // Set a UIScrollView as root so the input context can scroll it when the keyboard opens:
+    UIScrollView *scrollView = [[UIScrollView alloc] init];
+    scrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    scrollView.contentSize = scrollView.bounds.size;
+    scrollView.scrollEnabled = NO;
+    self.window.rootViewController.view = scrollView;
+
     self.window.hidden = NO;
 
     return YES;
