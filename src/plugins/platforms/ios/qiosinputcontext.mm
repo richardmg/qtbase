@@ -48,7 +48,12 @@
 @public
     QIOSInputContext *m_context;
     BOOL m_keyboardVisible;
+    BOOL m_keyboardVisibleAndDocked;
     QRectF m_keyboardRect;
+    QRectF m_keyboardEndRect;
+    NSTimeInterval m_duration;
+    UIViewAnimationCurve m_curve;
+    UIViewController *m_viewController;
 }
 @end
 
@@ -60,8 +65,31 @@
     if (self) {
         m_context = context;
         m_keyboardVisible = NO;
-        // After the keyboard became undockable (iOS5), UIKeyboardWillShow/UIKeyboardWillHide
-        // no longer works for all cases. So listen to keyboard frame changes instead:
+        m_keyboardVisibleAndDocked = NO;
+        m_duration = 0;
+        m_curve = UIViewAnimationCurveEaseOut;
+        m_viewController = 0;
+
+        if (isQtApplication()) {
+            // Get the root view controller that is on the same screen as the keyboard:
+            for (UIWindow *uiWindow in [[UIApplication sharedApplication] windows]) {
+                if (uiWindow.screen == [UIScreen mainScreen]) {
+                    m_viewController = [uiWindow.rootViewController retain];
+                    break;
+                }
+            }
+            Q_ASSERT(m_viewController);
+            Q_ASSERT([m_viewController.view isKindOfClass:[UIScrollView class]]);
+        }
+
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+            selector:@selector(keyboardWillShow:)
+            name:@"UIKeyboardWillShowNotification" object:nil];
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+            selector:@selector(keyboardWillHide:)
+            name:@"UIKeyboardWillHideNotification" object:nil];
         [[NSNotificationCenter defaultCenter]
             addObserver:self
             selector:@selector(keyboardDidChangeFrame:)
@@ -72,6 +100,13 @@
 
 - (void) dealloc
 {
+    [m_viewController release];
+    [[NSNotificationCenter defaultCenter]
+        removeObserver:self
+        name:@"UIKeyboardWillShowNotification" object:nil];
+    [[NSNotificationCenter defaultCenter]
+        removeObserver:self
+        name:@"UIKeyboardWillHideNotification" object:nil];
     [[NSNotificationCenter defaultCenter]
         removeObserver:self
         name:@"UIKeyboardDidChangeFrameNotification" object:nil];
@@ -84,11 +119,10 @@
     // orientation (which is the interface orientation of the root view controller).
     // For hybrid apps we follow native behavior, and return the rect unmodified:
     CGRect keyboardFrame = [[notification userInfo][UIKeyboardFrameEndUserInfoKey] CGRectValue];
-    if (isQtApplication()) {
-        UIInterfaceOrientation orientation = [UIApplication sharedApplication].keyWindow.rootViewController.interfaceOrientation;
+    if (m_viewController) {
         const CGSize &screenSize = [UIScreen mainScreen].bounds.size;
 
-        switch (orientation) {
+        switch (m_viewController.interfaceOrientation) {
         case UIInterfaceOrientationPortraitUpsideDown:
             return QRect(screenSize.width - keyboardFrame.origin.x - keyboardFrame.size.width,
                          screenSize.height - keyboardFrame.origin.y - keyboardFrame.size.height,
@@ -113,6 +147,7 @@
 - (void) keyboardDidChangeFrame:(NSNotification *)notification
 {
     m_keyboardRect = [self getKeyboardRect:notification];
+    m_keyboardEndRect = m_keyboardRect;
     m_context->emitKeyboardRectChanged();
 
     BOOL visible = m_keyboardRect.intersects(fromCGRect([UIScreen mainScreen].bounds));
@@ -120,6 +155,31 @@
         m_keyboardVisible = visible;
         m_context->emitInputPanelVisibleChanged();
     }
+
+    // If the keyboard was visible and docked from before, this is just a geometry
+    // change (normally caused by an orientation change). In that case, update scroll:
+    if (m_keyboardVisibleAndDocked)
+        m_context->updateScrollView();
+}
+
+- (void) keyboardWillShow:(NSNotification *)notification
+{
+    // Note that UIKeyboardWillShowNotification is only sendt when the keyboard is docked.
+    m_keyboardVisibleAndDocked = YES;
+    m_keyboardEndRect = [self getKeyboardRect:notification];
+    if (!m_duration) {
+        m_duration = [notification.userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+        m_curve = [notification.userInfo[UIKeyboardAnimationCurveUserInfoKey] integerValue] << 16;
+    }
+    m_context->updateScrollView();
+}
+
+- (void) keyboardWillHide:(NSNotification *)notification
+{
+    // Note that UIKeyboardWillHideNotification is also sendt when the keyboard is undocked.
+    m_keyboardVisibleAndDocked = NO;
+    m_keyboardEndRect = [self getKeyboardRect:notification];
+    m_context->updateScrollView();
 }
 
 @end
@@ -130,6 +190,8 @@ QIOSInputContext::QIOSInputContext()
     , m_focusView(0)
     , m_hasPendingHideRequest(false)
 {
+    if (isQtApplication())
+        connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::updateScrollView);
     connect(qGuiApp, &QGuiApplication::focusWindowChanged, this, &QIOSInputContext::focusWindowChanged);
 }
 
@@ -179,4 +241,39 @@ void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
         [view becomeFirstResponder];
     [m_focusView release];
     m_focusView = [view retain];
+}
+
+void QIOSInputContext::updateScrollView()
+{
+    // Scroll the screen if:
+    // - our backend controls the root view controller on the main screen (no hybrid app)
+    // - the focus object is on the same screen as the keyboard.
+    // - the first responder is a QUIView, and not some other foreign UIView.
+    // - the keyboard is docked. Otherwise the user can move the keyboard instead.
+    if (!m_keyboardListener->m_viewController || !m_focusView)
+        return;
+
+    UIScrollView *scrollView = static_cast<UIScrollView *>(m_keyboardListener->m_viewController.view);
+    qreal scrollTo = 0;
+
+    if (m_focusView.isFirstResponder
+            && m_keyboardListener->m_keyboardVisibleAndDocked
+            && m_focusView.window == scrollView.window) {
+        QRectF cursorRect = qGuiApp->inputMethod()->cursorRectangle();
+        qreal cursorBottomY = cursorRect.bottomLeft().y();
+        qreal keyboardY = m_keyboardListener->m_keyboardEndRect.y();
+        const qreal topMargin = 50;
+        const qreal bottomMargin = 20;
+        if (cursorBottomY > keyboardY - bottomMargin)
+            scrollTo = qMin(scrollView.bounds.size.height - keyboardY, cursorRect.y() - topMargin);
+    }
+
+    if (scrollTo != scrollView.bounds.origin.y) {
+        CGRect newBounds = scrollView.bounds;
+        newBounds.origin.y = scrollTo;
+        [UIView animateWithDuration:m_keyboardListener->m_duration delay:0
+            options:m_keyboardListener->m_curve
+            animations:^{ scrollView.bounds = newBounds; }
+            completion: NULL];
+    }
 }
