@@ -171,6 +171,7 @@ QIOSInputContext::QIOSInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
     , m_hasPendingHideRequest(false)
+    , m_inKeyboardImChange(false)
 {
     if (m_keyboardListener->m_viewController)
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::updateScrollView);
@@ -233,6 +234,19 @@ void QIOSInputContext::showInputPanel()
         }
     }
 
+    if (m_focusView.isFirstResponder) {
+        // Since m_focusView is already the first responder, it means that the keyboard is already open.
+        // In that case the call to becomeFirstResponder will not update the keyboard layout even if
+        // UIKeyInput properties has changed. As a work-around, we quickly resign first responder just to
+        // grab it again. To not remove focusObject in the same go, we need to call the super implementation
+        // of resignFirstResponder. Since the call will cause a 'keyboardWillHide' notification to be sendt, we
+        // also block updateScrolling to avoid artifacts:
+        m_inKeyboardImChange = true;
+        SEL sel = @selector(resignFirstResponder);
+        [[m_focusView superclass] instanceMethodForSelector:sel](m_focusView, sel);
+        m_inKeyboardImChange = false;
+    }
+
     [m_focusView becomeFirstResponder];
 }
 
@@ -270,7 +284,7 @@ void QIOSInputContext::updateScrollView()
     // - the first responder is a QUIView, and not some other foreign UIView.
     // - the keyboard is docked. Otherwise the user can move the keyboard instead.
     // - the inputItem has not been moved/scrolled
-    if (!isQtApplication() || !m_focusView)
+    if (!isQtApplication() || !m_focusView || m_inKeyboardImChange)
         return;
 
     static QObject *currentFocusObject = 0;
