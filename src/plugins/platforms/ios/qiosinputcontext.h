@@ -69,6 +69,7 @@ private:
     QIOSKeyboardListener *m_keyboardListener;
     UIView<UIKeyInput> *m_focusView;
     bool m_hasPendingHideRequest;
+    bool m_inKeyboardImChange;
 };
 
 QT_END_NAMESPACE
