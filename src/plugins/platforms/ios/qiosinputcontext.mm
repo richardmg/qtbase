@@ -196,6 +196,43 @@ void QIOSInputContext::showInputPanel()
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
     m_hasPendingHideRequest = false;
+
+    // Ask the current focus object what kind of input it expects, and configure the keyboard appropriately:
+    QObject *focusObject = QGuiApplication::focusObject();
+    if (focusObject) {
+        QInputMethodQueryEvent queryEvent(Qt::ImEnabled | Qt::ImHints);
+        if (QCoreApplication::sendEvent(QGuiApplication::focusObject(), &queryEvent)) {
+            if (queryEvent.value(Qt::ImEnabled).toBool()) {
+                Qt::InputMethodHints hints = static_cast<Qt::InputMethodHints>(queryEvent.value(Qt::ImHints).toUInt());
+
+                m_focusView.returnKeyType = (hints & Qt::ImhMultiLine) ? UIReturnKeyDefault : UIReturnKeyDone;
+                m_focusView.secureTextEntry = BOOL(hints & Qt::ImhHiddenText);
+                m_focusView.autocorrectionType = (hints & Qt::ImhNoPredictiveText) ?
+                            UITextAutocorrectionTypeNo : UITextAutocorrectionTypeDefault;
+
+                if (hints & Qt::ImhUppercaseOnly)
+                    m_focusView.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+                else if (hints & Qt::ImhNoAutoUppercase)
+                    m_focusView.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                else
+                    m_focusView.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+
+                if (hints & Qt::ImhUrlCharactersOnly)
+                    m_focusView.keyboardType = UIKeyboardTypeURL;
+                else if (hints & Qt::ImhEmailCharactersOnly)
+                    m_focusView.keyboardType = UIKeyboardTypeEmailAddress;
+                else if (hints & Qt::ImhDigitsOnly)
+                    m_focusView.keyboardType = UIKeyboardTypeNumberPad;
+                else if (hints & Qt::ImhFormattedNumbersOnly)
+                    m_focusView.keyboardType = UIKeyboardTypeDecimalPad;
+                else if (hints & Qt::ImhDialableCharactersOnly)
+                    m_focusView.keyboardType = UIKeyboardTypeNumberPad;
+                else
+                    m_focusView.keyboardType = UIKeyboardTypeNamePhonePad;
+            }
+        }
+    }
+
     [m_focusView becomeFirstResponder];
 }
 
