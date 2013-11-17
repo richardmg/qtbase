@@ -214,6 +214,19 @@ void QIOSInputContext::showInputPanel()
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
     m_hasPendingHideRequest = false;
+
+    // Ask the current focus object what kind of input it expects, and configure the keyboard appropriately:
+    QObject *focusObject = QGuiApplication::focusObject();
+    if (focusObject) {
+        QInputMethodQueryEvent queryEvent(Qt::ImEnabled | Qt::ImHints);
+        if (QCoreApplication::sendEvent(QGuiApplication::focusObject(), &queryEvent)) {
+            if (queryEvent.value(Qt::ImEnabled).toBool()) {
+                Qt::InputMethodHints hints = static_cast<Qt::InputMethodHints>(queryEvent.value(Qt::ImHints).toUInt());
+                m_focusView.returnKeyType = (hints & Qt::ImhMultiLine) ? UIReturnKeyDefault : UIReturnKeyDone;
+            }
+        }
+    }
+
     [m_focusView becomeFirstResponder];
 }
 
