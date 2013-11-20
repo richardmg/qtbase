@@ -44,6 +44,7 @@
 
 #include <UIKit/UIKit.h>
 
+#include <QtGui/qtransform.h>
 #include <qpa/qplatforminputcontext.h>
 
 QT_BEGIN_NAMESPACE
