@@ -269,8 +269,20 @@ void QIOSInputContext::updateScrollView()
     // - the focus object is on the same screen as the keyboard.
     // - the first responder is a QUIView, and not some other foreign UIView.
     // - the keyboard is docked. Otherwise the user can move the keyboard instead.
+    // - the inputItem has not been moved/scrolled
     if (!isQtApplication() || !m_focusView)
         return;
+
+    static QObject *currentFocusObject = 0;
+    static QTransform currentTransform;
+    if (currentFocusObject != qGuiApp->focusObject()) {
+        currentFocusObject = qGuiApp->focusObject();
+        currentTransform = qApp->inputMethod()->inputItemTransform();
+    } else if (currentTransform != qApp->inputMethod()->inputItemTransform()) {
+        // The inputItem has moved since the last scroll update. To avoid competing
+        // with the application where the cursor/inputItem should be, we bail:
+        return;
+    }
 
     UIView *scrollView = m_keyboardListener->m_viewController.view;
     qreal scrollTo = 0;
