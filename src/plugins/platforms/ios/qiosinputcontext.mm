@@ -43,6 +43,7 @@
 #include "qiosinputcontext.h"
 #include "qioswindow.h"
 #include <QGuiApplication>
+#include <QPointer>
 
 @interface QIOSKeyboardListener : NSObject {
 @public
@@ -213,9 +214,11 @@ void QIOSInputContext::hideInputPanel()
     // 'line edits'. In that case the 'line edit' that lost focus will close the input
     // panel, just to see that the new 'line edit' will open it again:
     m_hasPendingHideRequest = true;
+    QPointer<QIOSInputContext> *destructionGuard = new QPointer<QIOSInputContext>(this);
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (m_hasPendingHideRequest)
+        if (!destructionGuard->isNull() && m_hasPendingHideRequest)
             [m_focusView resignFirstResponder];
+        delete destructionGuard;
     });
 }
 
