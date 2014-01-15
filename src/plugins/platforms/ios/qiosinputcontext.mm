@@ -177,9 +177,8 @@
 QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
-    , m_focusView(0)
+    , m_inputView(0)
     , m_hasPendingHideRequest(false)
-    , m_focusObject(0)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -189,7 +188,7 @@ QIOSInputContext::QIOSInputContext()
 QIOSInputContext::~QIOSInputContext()
 {
     [m_keyboardListener release];
-    [m_focusView release];
+    [m_inputView release];
 }
 
 QRectF QIOSInputContext::keyboardRect() const
@@ -205,7 +204,7 @@ void QIOSInputContext::showInputPanel()
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
     m_hasPendingHideRequest = false;
-    [m_focusView becomeFirstResponder];
+    [m_inputView becomeFirstResponder];
 }
 
 void QIOSInputContext::hideInputPanel()
@@ -217,7 +216,7 @@ void QIOSInputContext::hideInputPanel()
     QPointer<QIOSInputContext> *destructionGuard = new QPointer<QIOSInputContext>(this);
     dispatch_async(dispatch_get_main_queue(), ^{
         if (!destructionGuard->isNull() && m_hasPendingHideRequest)
-            [m_focusView resignFirstResponder];
+            [m_inputView resignFirstResponder];
         delete destructionGuard;
     });
 }
@@ -229,25 +228,12 @@ bool QIOSInputContext::isInputPanelVisible() const
 
 void QIOSInputContext::setFocusObject(QObject *focusObject)
 {
-    m_focusObject = focusObject;
-
-    if (!m_focusView || !m_focusView.isFirstResponder) {
+    if (!focusObject || !m_inputView || !m_inputView.isFirstResponder) {
         scroll(0);
         return;
     }
 
-    // Since m_focusView is the first responder, it means that the keyboard is open and we
-    // should update keyboard layout. But there seem to be no way to tell it to reread the
-    // UITextInputTraits from m_focusView. To work around that, we quickly resign first
-    // responder status just to reassign it again. To not remove the focusObject in the same
-    // go, we need to call the super implementation of resignFirstResponder. Since the call
-    // will cause a 'keyboardWillHide' notification to be sendt, we also block scrollRootView
-    // to avoid artifacts:
-    m_keyboardListener->m_ignoreKeyboardChanges = true;
-    SEL sel = @selector(resignFirstResponder);
-    [[m_focusView superclass] instanceMethodForSelector:sel](m_focusView, sel);
-    [m_focusView becomeFirstResponder];
-    m_keyboardListener->m_ignoreKeyboardChanges = false;
+    reset();
 
     if (m_keyboardListener->m_keyboardVisibleAndDocked)
         scrollToCursor();
@@ -255,12 +241,11 @@ void QIOSInputContext::setFocusObject(QObject *focusObject)
 
 void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
 {
-    UIView<UIKeyInput> *view = focusWindow ?
-                reinterpret_cast<UIView<UIKeyInput> *>(focusWindow->handle()->winId()) : 0;
-    if ([m_focusView isFirstResponder])
+    QUITextInputView *view = focusWindow ? reinterpret_cast<QUITextInputView *>(focusWindow->handle()->winId()) : 0;
+    if ([m_inputView isFirstResponder])
         [view becomeFirstResponder];
-    [m_focusView release];
-    m_focusView = [view retain];
+    [m_inputView release];
+    m_inputView = [view retain];
 
     if (view.window != m_keyboardListener->m_viewController.view)
         scroll(0);
@@ -276,7 +261,7 @@ void QIOSInputContext::cursorRectangleChanged()
     // itself moves, we need to ask the focus object for ImCursorRectangle:
     static QPoint prevCursor;
     QInputMethodQueryEvent queryEvent(Qt::ImCursorRectangle);
-    QCoreApplication::sendEvent(m_focusObject, &queryEvent);
+    QCoreApplication::sendEvent(qApp->focusObject(), &queryEvent);
     QPoint cursor = queryEvent.value(Qt::ImCursorRectangle).toRect().topLeft();
     if (cursor != prevCursor)
         scrollToCursor();
@@ -285,16 +270,16 @@ void QIOSInputContext::cursorRectangleChanged()
 
 void QIOSInputContext::scrollToCursor()
 {
-    if (!isQtApplication() || !m_focusView)
+    if (!isQtApplication() || !m_inputView)
         return;
 
     UIView *view = m_keyboardListener->m_viewController.view;
-    if (view.window != m_focusView.window)
+    if (view.window != m_inputView.window)
         return;
 
     const int margin = 20;
     QRectF translatedCursorPos = qApp->inputMethod()->cursorRectangle();
-    translatedCursorPos.translate(m_focusView.qwindow->geometry().topLeft());
+    translatedCursorPos.translate(m_inputView.qwindow->geometry().topLeft());
     qreal keyboardY = m_keyboardListener->m_keyboardEndRect.y();
     int statusBarY = qGuiApp->primaryScreen()->availableGeometry().y();
 
@@ -316,5 +301,24 @@ void QIOSInputContext::scroll(int y)
         options:m_keyboardListener->m_curve
         animations:^{ view.bounds = newBounds; }
         completion:0];
+}
+
+void QIOSInputContext::update(Qt::InputMethodQueries query)
+{
+    [m_inputView updateInputMethodWithQuery:query];
+}
+
+void QIOSInputContext::reset()
+{
+    // Since the call to reset will cause a 'keyboardWillHide'
+    // notification to be sendt, we block keyboard nofifications to avoid artifacts:
+    m_keyboardListener->m_ignoreKeyboardChanges = true;
+    [m_inputView reset];
+    m_keyboardListener->m_ignoreKeyboardChanges = false;
+}
+
+void QIOSInputContext::commit()
+{
+    [m_inputView commit];
 }
 

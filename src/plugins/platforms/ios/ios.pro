@@ -21,7 +21,8 @@ OBJECTIVE_SOURCES = \
     qiosinputcontext.mm \
     qiostheme.mm \
     qiosglobal.mm \
-    qiosservices.mm
+    qiosservices.mm \
+    quitextinputview.mm
 
 HEADERS = \
     qiosintegration.h \
@@ -36,6 +37,7 @@ HEADERS = \
     qiosinputcontext.h \
     qiostheme.h \
     qiosglobal.h \
-    qiosservices.h
+    qiosservices.h \
+    quitextinputview.h
 
 #HEADERS = qiossoftwareinputhandler.h

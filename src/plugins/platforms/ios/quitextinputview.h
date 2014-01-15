@@ -39,47 +39,40 @@
 **
 ****************************************************************************/
 
-#ifndef QIOSINPUTCONTEXT_H
-#define QIOSINPUTCONTEXT_H
+#ifndef QUITEXTINPUTVIEW_H
+#define QUITEXTINPUTVIEW_H
 
 #include <UIKit/UIKit.h>
+#include <QtCore/QtCore>
 
-#include <QtGui/qevent.h>
-#include <QtGui/qtransform.h>
-#include <qpa/qplatforminputcontext.h>
-#include <quitextinputview.h>
-
-QT_BEGIN_NAMESPACE
-
-@class QIOSKeyboardListener;
-
-class QIOSInputContext : public QPlatformInputContext
+@interface QUITextInputView : UIView <UITextInput>
 {
-public:
-    QIOSInputContext();
-    ~QIOSInputContext();
+@public
+    UITextAutocapitalizationType autocapitalizationType;
+    UITextAutocorrectionType autocorrectionType;
+    BOOL enablesReturnKeyAutomatically;
+    UIKeyboardAppearance keyboardAppearance;
+    UIKeyboardType keyboardType;
+    UIReturnKeyType returnKeyType;
+    BOOL secureTextEntry;
+    QString m_markedText;
+    QInputMethodQueryEvent *m_inputMethodQueryEvent;
+}
 
-    QRectF keyboardRect() const;
-    void showInputPanel();
-    void hideInputPanel();
-    bool isInputPanelVisible() const;
-    void setFocusObject(QObject *object);
+@property(nonatomic) UITextAutocapitalizationType autocapitalizationType;
+@property(nonatomic) UITextAutocorrectionType autocorrectionType;
+@property(nonatomic) UITextSpellCheckingType spellCheckingType;
+@property(nonatomic) BOOL enablesReturnKeyAutomatically;
+@property(nonatomic) UIKeyboardAppearance keyboardAppearance;
+@property(nonatomic) UIKeyboardType keyboardType;
+@property(nonatomic) UIReturnKeyType returnKeyType;
+@property(nonatomic, getter=isSecureTextEntry) BOOL secureTextEntry;
+@property(nonatomic, assign) id<UITextInputDelegate> inputDelegate;
 
-    void focusWindowChanged(QWindow *focusWindow);
-    void cursorRectangleChanged();
-    void scrollToCursor();
-    void scroll(int y);
+- (void)updateInputMethodWithQuery:(Qt::InputMethodQueries)query;
+- (void)reset;
+- (void)commit;
 
-    void update(Qt::InputMethodQueries);
-    void reset();
-    void commit();
+@end
 
-private:
-    QIOSKeyboardListener *m_keyboardListener;
-    QUITextInputView *m_inputView;
-    bool m_hasPendingHideRequest;
-};
-
-QT_END_NAMESPACE
-
-#endif
+#endif // QUITEXTINPUTVIEW_H
