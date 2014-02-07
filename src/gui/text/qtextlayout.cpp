@@ -239,7 +239,9 @@ int QTextInlineObject::formatIndex() const
 */
 QTextFormat QTextInlineObject::format() const
 {
-    return eng->format(&eng->layoutData->items[itm]);
+    if (!eng->block.docHandle())
+        return QTextFormat();
+    return eng->formats()->format(eng->formatIndex(&eng->layoutData->items[itm]));
 }
 
 /*!
@@ -1810,10 +1812,9 @@ void QTextLine::layout_helper(int maxGlyphs)
             lbh.whiteSpaceOrObject = true;
             lbh.tmpData.length++;
 
-            if (eng->block.docHandle()) {
-                QTextInlineObject inlineObject(item, eng);
-                eng->docLayout()->positionInlineObject(inlineObject, eng->block.position() + current.position, inlineObject.format());
-            }
+            QTextFormat format = eng->formats()->format(eng->formatIndex(&eng->layoutData->items[item]));
+            if (eng->block.docHandle())
+                eng->docLayout()->positionInlineObject(QTextInlineObject(item, eng), eng->block.position() + current.position, format);
 
             lbh.tmpData.textWidth += current.width;
 
