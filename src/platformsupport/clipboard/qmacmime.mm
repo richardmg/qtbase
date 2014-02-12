@@ -39,7 +39,7 @@
 **
 ****************************************************************************/
 
-#include "qmacmime.h"
+#include "qmacmime_p.h"
 #include "qcocoahelpers.h"
 #include "qmacclipboard.h"
 
