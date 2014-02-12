@@ -40,8 +40,11 @@
 ****************************************************************************/
 
 #include "qmacmime_p.h"
+
+#ifdef Q_OS_OSX
 #include "qcocoahelpers.h"
 #include "qmacclipboard.h"
+#endif
 
 #include "qdebug.h"
 #include "qpixmap.h"
@@ -56,7 +59,11 @@
 #include "qurl.h"
 #include "qmap.h"
 
-#include <Cocoa/Cocoa.h>
+#ifdef Q_OS_OSX
+#import <Cocoa/Cocoa.h>
+#else
+#import <UIKit/UIKit.h>
+#endif
 
 QT_BEGIN_NAMESPACE
 
@@ -107,13 +114,6 @@ const QStringList& qt_mac_enabledDraggedTypes()
   QDnD debug facilities
  *****************************************************************************/
 //#define DEBUG_MIME_MAPS
-
-//functions
-extern QString qt_mac_from_pascal_string(const Str255);  //qglobal.cpp
-extern void qt_mac_from_pascal_string(QString, Str255, TextEncoding encoding=0, int len=-1);  //qglobal.cpp
-
-ScrapFlavorType qt_mac_mime_type = 'CUTE';
-CFStringRef qt_mac_mime_typeUTI = CFSTR("com.pasteboard.trolltech.marker");
 
 /*!
   \class QMacPasteboardMime
@@ -303,7 +303,7 @@ QVariant QMacPasteboardMimeTypeName::convertToMime(const QString &, QList<QByteA
 QList<QByteArray> QMacPasteboardMimeTypeName::convertFromMime(const QString &, QVariant, QString)
 {
     QList<QByteArray> ret;
-    ret.append(QString("x-qt-mime-type-name").toUtf8());
+    ret.append(QString(QLatin1String("x-qt-mime-type-name")).toUtf8());
     return ret;
 }
 
@@ -349,11 +349,10 @@ QVariant QMacPasteboardMimePlainText::convertToMime(const QString &mimetype, QLi
         qWarning("QMacPasteboardMimePlainText: Cannot handle multiple member data");
     const QByteArray &firstData = data.first();
     QVariant ret;
-    if (flavor == QCFString(QLatin1String("com.apple.traditional-mac-plain-text"))) {
-        QCFString str(CFStringCreateWithBytes(kCFAllocatorDefault,
+    if (flavor == QLatin1String("com.apple.traditional-mac-plain-text")) {
+        return QString::fromCFString(CFStringCreateWithBytes(kCFAllocatorDefault,
                                              reinterpret_cast<const UInt8 *>(firstData.constData()),
                                              firstData.size(), CFStringGetSystemEncoding(), false));
-        ret = QString(str);
     } else {
         qWarning("QMime::convertToMime: unhandled mimetype: %s", qPrintable(mimetype));
     }
@@ -364,7 +363,7 @@ QList<QByteArray> QMacPasteboardMimePlainText::convertFromMime(const QString &, 
 {
     QList<QByteArray> ret;
     QString string = data.toString();
-    if (flavor == QCFString(QLatin1String("com.apple.traditional-mac-plain-text")))
+    if (flavor == QLatin1String("com.apple.traditional-mac-plain-text"))
         ret.append(string.toLatin1());
     return ret;
 }
@@ -425,10 +424,9 @@ QVariant QMacPasteboardMimeUnicodeText::convertToMime(const QString &mimetype, Q
     // I can only handle two types (system and unicode) so deal with them that way
     QVariant ret;
     if (flavor == QLatin1String("public.utf8-plain-text")) {
-        QCFString str(CFStringCreateWithBytes(kCFAllocatorDefault,
+        ret = QString::fromCFString(CFStringCreateWithBytes(kCFAllocatorDefault,
                                              reinterpret_cast<const UInt8 *>(firstData.constData()),
                                              firstData.size(), CFStringGetSystemEncoding(), false));
-        ret = QString(str);
     } else if (flavor == QLatin1String("public.utf16-plain-text")) {
         ret = QString(reinterpret_cast<const QChar *>(firstData.constData()),
                       firstData.size() / sizeof(QChar));
@@ -503,6 +501,7 @@ QList<QByteArray> QMacPasteboardMimeHTMLText::convertFromMime(const QString &mim
     return ret;
 }
 
+#ifdef Q_OS_OSX
 class QMacPasteboardMimeTiff : public QMacInternalPasteboardMime {
 public:
     QMacPasteboardMimeTiff() : QMacInternalPasteboardMime(MIME_ALL) { }
@@ -594,7 +593,6 @@ QList<QByteArray> QMacPasteboardMimeTiff::convertFromMime(const QString &mime, Q
     return ret;
 }
 
-
 class QMacPasteboardMimeFileUri : public QMacInternalPasteboardMime {
 public:
     QMacPasteboardMimeFileUri() : QMacInternalPasteboardMime(MIME_ALL) { }
@@ -672,6 +670,62 @@ int QMacPasteboardMimeFileUri::count(QMimeData *mimeData)
 {
     return mimeData->urls().count();
 }
+#endif
+
+class QMacPasteboardMimeVCard : public QMacInternalPasteboardMime
+{
+public:
+    QMacPasteboardMimeVCard() : QMacInternalPasteboardMime(MIME_ALL){ }
+    QString convertorName();
+
+    QString flavorFor(const QString &mime);
+    QString mimeFor(QString flav);
+    bool canConvert(const QString &mime, QString flav);
+    QVariant convertToMime(const QString &mime, QList<QByteArray> data, QString flav);
+    QList<QByteArray> convertFromMime(const QString &mime, QVariant data, QString flav);
+};
+
+QString QMacPasteboardMimeVCard::convertorName()
+{
+    return QLatin1String("VCard");
+}
+
+bool QMacPasteboardMimeVCard::canConvert(const QString &mime, QString flav)
+{
+    return mimeFor(flav) == mime;
+}
+
+QString QMacPasteboardMimeVCard::flavorFor(const QString &mime)
+{
+    if (mime.startsWith(QLatin1String("text/plain")))
+        return QLatin1String("public.vcard");
+    return QString();
+}
+
+QString QMacPasteboardMimeVCard::mimeFor(QString flav)
+{
+    if (flav == QLatin1String("public.vcard"))
+        return QLatin1String("text/plain");
+    return QString();
+}
+
+QVariant QMacPasteboardMimeVCard::convertToMime(const QString &mime, QList<QByteArray> data, QString)
+{
+    QByteArray cards;
+    if (mime == QLatin1String("text/plain")) {
+        for (int i=0; i<data.size(); ++i)
+            cards += data[i];
+    }
+    return QVariant(cards);
+}
+
+QList<QByteArray> QMacPasteboardMimeVCard::convertFromMime(const QString &mime, QVariant data, QString)
+{
+    QList<QByteArray> ret;
+    if (mime == QLatin1String("text/plain"))
+        ret.append(data.toString().toUtf8());
+    return ret;
+}
 
 class QMacPasteboardMimeUrl : public QMacInternalPasteboardMime {
 public:
@@ -747,62 +801,6 @@ QList<QByteArray> QMacPasteboardMimeUrl::convertFromMime(const QString &mime, QV
     return ret;
 }
 
-class QMacPasteboardMimeVCard : public QMacInternalPasteboardMime
-{
-public:
-    QMacPasteboardMimeVCard() : QMacInternalPasteboardMime(MIME_ALL){ }
-    QString convertorName();
-
-    QString flavorFor(const QString &mime);
-    QString mimeFor(QString flav);
-    bool canConvert(const QString &mime, QString flav);
-    QVariant convertToMime(const QString &mime, QList<QByteArray> data, QString flav);
-    QList<QByteArray> convertFromMime(const QString &mime, QVariant data, QString flav);
-};
-
-QString QMacPasteboardMimeVCard::convertorName()
-{
-    return QString("VCard");
-}
-
-bool QMacPasteboardMimeVCard::canConvert(const QString &mime, QString flav)
-{
-    return mimeFor(flav) == mime;
-}
-
-QString QMacPasteboardMimeVCard::flavorFor(const QString &mime)
-{
-    if (mime.startsWith(QLatin1String("text/plain")))
-        return QLatin1String("public.vcard");
-    return QString();
-}
-
-QString QMacPasteboardMimeVCard::mimeFor(QString flav)
-{
-    if (flav == QLatin1String("public.vcard"))
-        return QLatin1String("text/plain");
-    return QString();
-}
-
-QVariant QMacPasteboardMimeVCard::convertToMime(const QString &mime, QList<QByteArray> data, QString)
-{
-    QByteArray cards;
-    if (mime == QLatin1String("text/plain")) {
-        for (int i=0; i<data.size(); ++i)
-            cards += data[i];
-    }
-    return QVariant(cards);
-}
-
-QList<QByteArray> QMacPasteboardMimeVCard::convertFromMime(const QString &mime, QVariant data, QString)
-{
-    QList<QByteArray> ret;
-    if (mime == QLatin1String("text/plain"))
-        ret.append(data.toString().toUtf8());
-    return ret;
-}
-
-
 /*!
   \internal
 
@@ -816,14 +814,16 @@ void QMacInternalPasteboardMime::initializeMimeTypes()
         new QMacPasteboardMimeAny;
 
         //standard types that we wrap
-        new QMacPasteboardMimeTiff;
         new QMacPasteboardMimeUnicodeText;
         new QMacPasteboardMimePlainText;
         new QMacPasteboardMimeHTMLText;
+#ifdef Q_OS_OSX
+        new QMacPasteboardMimeTiff;
         new QMacPasteboardMimeFileUri;
+#endif
+        new QMacPasteboardMimeVCard;
         new QMacPasteboardMimeUrl;
         new QMacPasteboardMimeTypeName;
-        new QMacPasteboardMimeVCard;
     }
 }
 
