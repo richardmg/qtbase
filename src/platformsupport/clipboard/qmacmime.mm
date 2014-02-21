@@ -501,6 +501,83 @@ QList<QByteArray> QMacPasteboardMimeHTMLText::convertFromMime(const QString &mim
     return ret;
 }
 
+class QMacPasteboardMimeFileUri : public QMacInternalPasteboardMime {
+public:
+    QMacPasteboardMimeFileUri() : QMacInternalPasteboardMime(MIME_ALL) { }
+    QString convertorName();
+
+    QString flavorFor(const QString &mime);
+    QString mimeFor(QString flav);
+    bool canConvert(const QString &mime, QString flav);
+    QVariant convertToMime(const QString &mime, QList<QByteArray> data, QString flav);
+    QList<QByteArray> convertFromMime(const QString &mime, QVariant data, QString flav);
+    int count(QMimeData *mimeData);
+};
+
+QString QMacPasteboardMimeFileUri::convertorName()
+{
+    return QLatin1String("FileURL");
+}
+
+QString QMacPasteboardMimeFileUri::flavorFor(const QString &mime)
+{
+    if (mime == QLatin1String("text/uri-list"))
+        return QLatin1String("public.file-url");
+    return QString();
+}
+
+QString QMacPasteboardMimeFileUri::mimeFor(QString flav)
+{
+    if (flav == QLatin1String("public.file-url"))
+        return QLatin1String("text/uri-list");
+    return QString();
+}
+
+bool QMacPasteboardMimeFileUri::canConvert(const QString &mime, QString flav)
+{
+    return mime == QLatin1String("text/uri-list") && flav == QLatin1String("public.file-url");
+}
+
+QVariant QMacPasteboardMimeFileUri::convertToMime(const QString &mime, QList<QByteArray> data, QString flav)
+{
+    if (!canConvert(mime, flav))
+        return QVariant();
+    QList<QVariant> ret;
+    for (int i = 0; i < data.size(); ++i) {
+        QUrl url = QUrl::fromEncoded(data.at(i));
+        if (url.host().toLower() == QLatin1String("localhost"))
+            url.setHost(QString());
+        url.setPath(url.path().normalized(QString::NormalizationForm_C));
+        ret.append(url);
+    }
+    return QVariant(ret);
+}
+
+QList<QByteArray> QMacPasteboardMimeFileUri::convertFromMime(const QString &mime, QVariant data, QString flav)
+{
+    QList<QByteArray> ret;
+    if (!canConvert(mime, flav))
+        return ret;
+    QList<QVariant> urls = data.toList();
+    for (int i = 0; i < urls.size(); ++i) {
+        QUrl url = urls.at(i).toUrl();
+        if (url.scheme().isEmpty())
+            url.setScheme(QLatin1String("file"));
+        if (url.scheme().toLower() == QLatin1String("file")) {
+            if (url.host().isEmpty())
+                url.setHost(QLatin1String("localhost"));
+            url.setPath(url.path().normalized(QString::NormalizationForm_D));
+        }
+        ret.append(url.toEncoded());
+    }
+    return ret;
+}
+
+int QMacPasteboardMimeFileUri::count(QMimeData *mimeData)
+{
+    return mimeData->urls().count();
+}
+
 #ifdef Q_OS_OSX
 class QMacPasteboardMimeTiff : public QMacInternalPasteboardMime {
 public:
@@ -591,84 +668,6 @@ QList<QByteArray> QMacPasteboardMimeTiff::convertFromMime(const QString &mime, Q
             reinterpret_cast<UInt8 *>(ar.data()));
     ret.append(ar);
     return ret;
-}
-
-class QMacPasteboardMimeFileUri : public QMacInternalPasteboardMime {
-public:
-    QMacPasteboardMimeFileUri() : QMacInternalPasteboardMime(MIME_ALL) { }
-    QString convertorName();
-
-    QString flavorFor(const QString &mime);
-    QString mimeFor(QString flav);
-    bool canConvert(const QString &mime, QString flav);
-    QVariant convertToMime(const QString &mime, QList<QByteArray> data, QString flav);
-    QList<QByteArray> convertFromMime(const QString &mime, QVariant data, QString flav);
-    int count(QMimeData *mimeData);
-};
-
-QString QMacPasteboardMimeFileUri::convertorName()
-{
-    return QLatin1String("FileURL");
-}
-
-QString QMacPasteboardMimeFileUri::flavorFor(const QString &mime)
-{
-    if (mime == QLatin1String("text/uri-list"))
-        return QCFString(UTTypeCreatePreferredIdentifierForTag(kUTTagClassOSType, CFSTR("furl"), 0));
-    return QString();
-}
-
-QString QMacPasteboardMimeFileUri::mimeFor(QString flav)
-{
-    if (flav == QCFString(UTTypeCreatePreferredIdentifierForTag(kUTTagClassOSType, CFSTR("furl"), 0)))
-        return QLatin1String("text/uri-list");
-    return QString();
-}
-
-bool QMacPasteboardMimeFileUri::canConvert(const QString &mime, QString flav)
-{
-    return mime == QLatin1String("text/uri-list")
-            && flav == QCFString(UTTypeCreatePreferredIdentifierForTag(kUTTagClassOSType, CFSTR("furl"), 0));
-}
-
-QVariant QMacPasteboardMimeFileUri::convertToMime(const QString &mime, QList<QByteArray> data, QString flav)
-{
-    if (!canConvert(mime, flav))
-        return QVariant();
-    QList<QVariant> ret;
-    for (int i = 0; i < data.size(); ++i) {
-        QUrl url = QUrl::fromEncoded(data.at(i));
-        if (url.host().toLower() == QLatin1String("localhost"))
-            url.setHost(QString());
-        url.setPath(url.path().normalized(QString::NormalizationForm_C));
-        ret.append(url);
-    }
-    return QVariant(ret);
-}
-
-QList<QByteArray> QMacPasteboardMimeFileUri::convertFromMime(const QString &mime, QVariant data, QString flav)
-{
-    QList<QByteArray> ret;
-    if (!canConvert(mime, flav))
-        return ret;
-    QList<QVariant> urls = data.toList();
-    for (int i = 0; i < urls.size(); ++i) {
-        QUrl url = urls.at(i).toUrl();
-        if (url.scheme().isEmpty())
-            url.setScheme(QLatin1String("file"));
-        if (url.scheme().toLower() == QLatin1String("file")) {
-            if (url.host().isEmpty())
-                url.setHost(QLatin1String("localhost"));
-            url.setPath(url.path().normalized(QString::NormalizationForm_D));
-        }
-        ret.append(url.toEncoded());
-    }
-    return ret;
-}
-
-int QMacPasteboardMimeFileUri::count(QMimeData *mimeData)
-{
-    return mimeData->urls().count();
 }
 #endif
 
@@ -819,8 +818,9 @@ void QMacInternalPasteboardMime::initializeMimeTypes()
         new QMacPasteboardMimeHTMLText;
 #ifdef Q_OS_OSX
         new QMacPasteboardMimeTiff;
-        new QMacPasteboardMimeFileUri;
 #endif
+        new QMacPasteboardMimeFileUri;
+        new QMacPasteboardMimeVCard;
         new QMacPasteboardMimeVCard;
         new QMacPasteboardMimeUrl;
         new QMacPasteboardMimeTypeName;
