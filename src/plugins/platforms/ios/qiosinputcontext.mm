@@ -45,7 +45,7 @@
 #include "quiview.h"
 #include <QGuiApplication>
 
-@interface QIOSKeyboardListener : NSObject {
+@interface QIOSKeyboardListener : UIGestureRecognizer {
 @public
     QIOSInputContext *m_context;
     BOOL m_keyboardVisible;
@@ -53,22 +53,26 @@
     BOOL m_ignoreKeyboardChanges;
     QRectF m_keyboardRect;
     QRectF m_keyboardEndRect;
+    CGRect m_keyboardCGRect;
     NSTimeInterval m_duration;
     UIViewAnimationCurve m_curve;
     UIViewController *m_viewController;
 }
+
+@property(nonatomic,readwrite) UIGestureRecognizerState state;
 @end
 
 @implementation QIOSKeyboardListener
 
 - (id)initWithQIOSInputContext:(QIOSInputContext *)context
 {
-    self = [super init];
+    self = [super initWithTarget:self action:@selector(gestureRecognized)];
     if (self) {
         m_context = context;
         m_keyboardVisible = NO;
         m_keyboardVisibleAndDocked = NO;
         m_ignoreKeyboardChanges = NO;
+        m_keyboardCGRect = CGRectZero;
         m_duration = 0;
         m_curve = UIViewAnimationCurveEaseOut;
         m_viewController = 0;
@@ -82,6 +86,12 @@
                 }
             }
             Q_ASSERT(m_viewController);
+
+            // Attach 'hide keyboard' gesture to the window, but
+            // keep it disabled when the keyboard is not visible.
+            self.enabled = NO;
+            self.delaysTouchesBegan = YES;
+            [m_viewController.view.window addGestureRecognizer:self];
         }
 
         [[NSNotificationCenter defaultCenter]
@@ -102,7 +112,9 @@
 
 - (void) dealloc
 {
+    [m_viewController.view.window removeGestureRecognizer:self];
     [m_viewController release];
+
     [[NSNotificationCenter defaultCenter]
         removeObserver:self
         name:@"UIKeyboardWillShowNotification" object:nil];
@@ -135,6 +147,7 @@
     if (m_ignoreKeyboardChanges)
         return;
 
+    m_keyboardCGRect = [[[notification userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
     [self handleKeyboardRectChanged];
 
     // If the keyboard was visible and docked from before, this is just a geometry
@@ -155,6 +168,7 @@
         m_curve = UIViewAnimationCurve([[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue] << 16);
     }
     m_context->scrollToCursor();
+    self.enabled = YES;
 }
 
 - (void) keyboardWillHide:(NSNotification *)notification
@@ -165,6 +179,7 @@
     m_keyboardVisibleAndDocked = NO;
     m_keyboardEndRect = [self getKeyboardRect:notification];
     m_context->scroll(0);
+    self.enabled = NO;
 }
 
 - (void) handleKeyboardRectChanged
@@ -181,6 +196,40 @@
         m_keyboardVisible = visible;
         m_context->emitInputPanelVisibleChanged();
     }
+}
+
+- (void)gestureRecognized
+{
+    m_context->hideInputPanel();
+}
+
+- (void)gestureTimeout
+{
+    self.state = UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    self.state = UIGestureRecognizerStatePossible;
+    // In UILongPressGestureRecognizer, 0.5 is documented as default
+    [self performSelector:@selector(gestureTimeout) withObject:nil afterDelay:0.5];
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    self.state = (CGRectContainsPoint(m_keyboardCGRect, [[touches anyObject] locationInView:nil]))
+        ? UIGestureRecognizerStateRecognized : UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    self.state = UIGestureRecognizerStateFailed;
 }
 
 @end
