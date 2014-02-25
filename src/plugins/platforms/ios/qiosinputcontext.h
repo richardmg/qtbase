@@ -73,6 +73,8 @@ public:
     void reset();
     void commit();
 
+    void touchesEnded(const QPointF touchPoint);
+
 private:
     QIOSKeyboardListener *m_keyboardListener;
     QUIView *m_focusView;

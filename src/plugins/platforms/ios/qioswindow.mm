@@ -270,6 +270,12 @@
     [self updateTouchList:touches withState:Qt::TouchPointReleased];
     [self sendTouchEventWithTimestamp:ulong(event.timestamp * 1000)];
 
+    if ([touches count] == 1) {
+        QPointF pos = m_activeTouches[[touches anyObject]].area.topLeft();
+        QPlatformInputContext *ic = QGuiApplicationPrivate::platformIntegration()->inputContext();
+        static_cast<QIOSInputContext *>(ic)->touchesEnded(pos);
+    }
+
     // Remove ended touch points from the active set:
     for (UITouch *touch in touches)
         m_activeTouches.remove(touch);

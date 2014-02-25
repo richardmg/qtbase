@@ -260,10 +260,32 @@ void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
         scroll(0);
 }
 
+void QIOSInputContext::touchesEnded(const QPointF touchPoint)
+{
+    if (m_keyboardListener->m_keyboardRect.contains(touchPoint)) {
+        // If a touch that started in a QUIView that was later released over
+        // the keyboard, we interpretate that as a gesture to close it.
+        hideInputPanel();
+    } else {
+        // Since we don't scroll when the user touches the
+        // screen, we perform a delayed scroll now.
+        cursorRectangleChanged();
+    }
+}
+
 void QIOSInputContext::cursorRectangleChanged()
 {
     if (!m_keyboardListener->m_keyboardVisibleAndDocked)
         return;
+    if (!qApp->mouseButtons() == Qt::NoButton) {
+        // We avoid scrolling if the user is touching the screen. The layer will animate its
+        // bounds during a scroll, but the view will change immediatly. This causes touch
+        // releases while animating to be released at different places than how it appears
+        // visually. This can cause strange artifacts. Instead we update scrolling we get
+        // a touch release. Note that it's fine to scroll to cursor during a rotation, since
+        // iOS will not deliver any touch release at that time.
+        return;
+    }
 
     // Check if the cursor has changed position inside the input item. Since
     // qApp->inputMethod()->cursorRectangle() will also change when the input item
