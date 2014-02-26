@@ -45,6 +45,62 @@
 #include "quiview.h"
 #include <QGuiApplication>
 
+@interface QIOSCloseKeyboardRecognizer : UIGestureRecognizer
+{
+    QIOSInputContext *m_context;
+}
+
+@property(nonatomic,readwrite) UIGestureRecognizerState state;
+@end
+
+@implementation QIOSCloseKeyboardRecognizer
+
+- (id)initWithQIOSInputContext:(QIOSInputContext *)context
+{
+    if (self = [super initWithTarget:self action:@selector(handleGesture)]) {
+        m_context = context;
+        self.delaysTouchesBegan = YES;
+    }
+    return self;
+}
+
+- (void)handleGesture
+{
+    m_context->hideInputPanel();
+}
+
+- (void)timeout
+{
+    self.state = UIGestureRecognizerStateCancelled;
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    [NSTimer scheduledTimerWithTimeInterval:0.5 target:self
+        selector:@selector(timeout) userInfo:nil repeats:NO];
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    self.state = m_context->keyboardRect().contains(QCursor::pos())
+        ? UIGestureRecognizerStateRecognized : UIGestureRecognizerStateCancelled;
+}
+
+- (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    Q_UNUSED(touches);
+    Q_UNUSED(event);
+    self.state = UIGestureRecognizerStateCancelled;
+}
+
+@end
+
+// -----------------------------------------------
+
 @interface QIOSKeyboardListener : NSObject {
 @public
     QIOSInputContext *m_context;
@@ -188,6 +244,7 @@
 QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
+    , m_closeKeyboardRecognizer([[QIOSCloseKeyboardRecognizer alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
     , m_hasPendingHideRequest(false)
 {
@@ -198,7 +255,9 @@ QIOSInputContext::QIOSInputContext()
 
 QIOSInputContext::~QIOSInputContext()
 {
+    [m_closeKeyboardRecognizer release];
     [m_keyboardListener release];
+    [m_focusView removeGestureRecognizer:m_closeKeyboardRecognizer];
     [m_focusView release];
 }
 
@@ -253,25 +312,13 @@ void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
     QUIView *view = focusWindow ? reinterpret_cast<QUIView *>(focusWindow->handle()->winId()) : 0;
     if ([m_focusView isFirstResponder])
         [view becomeFirstResponder];
+    [m_focusView removeGestureRecognizer:m_closeKeyboardRecognizer];
     [m_focusView release];
     m_focusView = [view retain];
+    [m_focusView addGestureRecognizer:m_closeKeyboardRecognizer];
 
     if (view.window != m_keyboardListener->m_viewController.view)
         scroll(0);
-}
-
-void QIOSInputContext::touchesEnded(const QPointF touchPoint)
-{
-    if (m_keyboardListener->m_keyboardRect.contains(touchPoint)) {
-        // If a touch that started in a QUIView that was later released over
-        // the keyboard, we interpretate that as a gesture to close it.
-        hideInputPanel();
-        [m_focusView clearSelection];
-    } else {
-        // Since we don't scroll when the user touches the
-        // screen, we perform a delayed scroll now.
-        cursorRectangleChanged();
-    }
 }
 
 void QIOSInputContext::cursorRectangleChanged()

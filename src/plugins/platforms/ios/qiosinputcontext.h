@@ -50,6 +50,7 @@
 QT_BEGIN_NAMESPACE
 
 @class QIOSKeyboardListener;
+@class QIOSCloseKeyboardRecognizer;
 @class QUIView;
 
 class QIOSInputContext : public QPlatformInputContext
@@ -73,10 +74,9 @@ public:
     void reset();
     void commit();
 
-    void touchesEnded(const QPointF touchPoint);
-
 private:
     QIOSKeyboardListener *m_keyboardListener;
+    QIOSCloseKeyboardRecognizer *m_closeKeyboardRecognizer;
     QUIView *m_focusView;
     bool m_hasPendingHideRequest;
 };
