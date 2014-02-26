@@ -250,6 +250,17 @@ Q_GLOBAL_STATIC(StaticVariables, staticVariables);
     [self sendEventToFocusObject:e];
 }
 
+- (void)clearSelection
+{
+    int cursorPos = [self imValue:Qt::ImCursorPosition].toInt();
+    QList<QInputMethodEvent::Attribute> attrs;
+    attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, cursorPos, 0, 0);
+    QInputMethodEvent e(m_markedText, attrs);
+    [self.inputDelegate selectionWillChange:id<UITextInput>(self)];
+    [self sendEventToFocusObject:e];
+    [self.inputDelegate selectionDidChange:id<UITextInput>(self)];
+}
+
 - (UITextRange *)selectedTextRange {
     int cursorPos = [self imValue:Qt::ImCursorPosition].toInt();
     int anchorPos = [self imValue:Qt::ImAnchorPosition].toInt();

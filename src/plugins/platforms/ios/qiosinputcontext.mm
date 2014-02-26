@@ -266,6 +266,7 @@ void QIOSInputContext::touchesEnded(const QPointF touchPoint)
         // If a touch that started in a QUIView that was later released over
         // the keyboard, we interpretate that as a gesture to close it.
         hideInputPanel();
+        [m_focusView clearSelection];
     } else {
         // Since we don't scroll when the user touches the
         // screen, we perform a delayed scroll now.
