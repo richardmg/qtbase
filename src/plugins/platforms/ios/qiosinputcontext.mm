@@ -90,7 +90,6 @@
             // Attach 'hide keyboard' gesture to the window, but
             // keep it disabled when the keyboard is not visible.
             self.enabled = NO;
-            self.delaysTouchesBegan = YES;
             [m_viewController.view.window addGestureRecognizer:self];
         }
 
