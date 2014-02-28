@@ -202,16 +202,11 @@
     Q_UNREACHABLE();
 }
 
-- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
     Q_UNUSED(event);
-    if (CGRectContainsPoint(m_keyboardCGRect, [[touches anyObject] locationInView:nil])) {
-        // A touch was released over the keyboard, so it should therefore hide.
-        // Since we here inspect touch events before any views, and since some
-        // Qt controls gain focus (and opens the keyboard) on touch release, we need to
-        // delay closing the keyboard until Qt has processed the touch events.
-        QMetaObject::invokeMethod(qApp->inputMethod(), "hide", Qt::QueuedConnection);
-    }
+    if (CGRectContainsPoint(m_keyboardCGRect, [[touches anyObject] locationInView:nil]))
+        m_context->hideInputPanel();
 }
 
 @end
