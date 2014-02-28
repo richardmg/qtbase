@@ -209,6 +209,12 @@
         m_context->hideInputPanel();
 }
 
+- (void) scrollToCursorDelayed
+{
+    if (m_keyboardVisibleAndDocked)
+        m_context->scrollToCursor();
+}
+
 @end
 
 QIOSInputContext::QIOSInputContext()
@@ -300,7 +306,9 @@ void QIOSInputContext::cursorRectangleChanged()
         static QPoint prevCursor;
         QPoint cursor = queryEvent.value(Qt::ImCursorRectangle).toRect().topLeft();
         if (cursor != prevCursor) {
-            scrollToCursor();
+            // We delay scrolling in case the cursor moved as a result of a 'close keyboard' gesture
+            [m_keyboardListener performSelector:@selector(scrollToCursorDelayed)
+              withObject:nil afterDelay:0.5];
             prevCursor = cursor;
         }
     }
@@ -365,4 +373,3 @@ void QIOSInputContext::commit()
 {
     [m_focusView commit];
 }
-
