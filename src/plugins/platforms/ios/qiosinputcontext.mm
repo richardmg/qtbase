@@ -268,13 +268,16 @@ void QIOSInputContext::cursorRectangleChanged()
     // Check if the cursor has changed position inside the input item. Since
     // qApp->inputMethod()->cursorRectangle() will also change when the input item
     // itself moves, we need to ask the focus object for ImCursorRectangle:
-    static QPoint prevCursor;
-    QInputMethodQueryEvent queryEvent(Qt::ImCursorRectangle);
+    QInputMethodQueryEvent queryEvent(Qt::ImEnabled | Qt::ImCursorRectangle);
     QCoreApplication::sendEvent(qApp->focusObject(), &queryEvent);
-    QPoint cursor = queryEvent.value(Qt::ImCursorRectangle).toRect().topLeft();
-    if (cursor != prevCursor)
-        scrollToCursor();
-    prevCursor = cursor;
+    if (queryEvent.value(Qt::ImEnabled).toBool()) {
+        static QPoint prevCursor;
+        QPoint cursor = queryEvent.value(Qt::ImCursorRectangle).toRect().topLeft();
+        if (cursor != prevCursor) {
+            scrollToCursor();
+            prevCursor = cursor;
+        }
+    }
 }
 
 void QIOSInputContext::scrollToCursor()
