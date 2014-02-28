@@ -339,6 +339,7 @@ void QIOSInputContext::scroll(int y)
         return;
 
     CGRect newBounds = view.bounds;
+    view.bounds = [[view.layer presentationLayer] bounds];
     newBounds.origin.y = y;
     QPointer<QIOSInputContext> self = this;
     [UIView animateWithDuration:m_keyboardListener->m_duration delay:0
