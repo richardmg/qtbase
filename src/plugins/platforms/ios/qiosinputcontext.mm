@@ -50,7 +50,6 @@
     QIOSInputContext *m_context;
     BOOL m_keyboardVisible;
     BOOL m_keyboardVisibleAndDocked;
-    BOOL m_ignoreKeyboardChanges;
     QRectF m_keyboardRect;
     QRectF m_keyboardEndRect;
     NSTimeInterval m_duration;
@@ -68,7 +67,6 @@
         m_context = context;
         m_keyboardVisible = NO;
         m_keyboardVisibleAndDocked = NO;
-        m_ignoreKeyboardChanges = NO;
         m_duration = 0;
         m_curve = UIViewAnimationCurveEaseOut;
         m_viewController = 0;
@@ -132,10 +130,11 @@
 - (void) keyboardDidChangeFrame:(NSNotification *)notification
 {
     Q_UNUSED(notification);
-    if (m_ignoreKeyboardChanges)
-        return;
 
-    [self handleKeyboardRectChanged];
+    // If the keyboard is told to show and hide within the same event loop callout (which will typically happen
+    // when transferring focus), this function will be called several times with different keyboard rects. To prevent
+    // emitting mixed show/hide signals etc, we delay updating our status:
+    [self performSelectorOnMainThread:@selector(handleKeyboardRectChanged) withObject:nil waitUntilDone:NO];
 
     // If the keyboard was visible and docked from before, this is just a geometry
     // change (normally caused by an orientation change). In that case, update scroll:
@@ -145,8 +144,6 @@
 
 - (void) keyboardWillShow:(NSNotification *)notification
 {
-    if (m_ignoreKeyboardChanges)
-        return;
     // Note that UIKeyboardWillShowNotification is only sendt when the keyboard is docked.
     m_keyboardVisibleAndDocked = YES;
     m_keyboardEndRect = [self getKeyboardRect:notification];
@@ -159,8 +156,6 @@
 
 - (void) keyboardWillHide:(NSNotification *)notification
 {
-    if (m_ignoreKeyboardChanges)
-        return;
     // Note that UIKeyboardWillHideNotification is also sendt when the keyboard is undocked.
     m_keyboardVisibleAndDocked = NO;
     m_keyboardEndRect = [self getKeyboardRect:notification];
@@ -189,7 +184,6 @@ QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
-    , m_hasPendingHideRequest(false)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -214,20 +208,16 @@ void QIOSInputContext::showInputPanel()
     // responder. Rather than searching for it from the top, we let the active QIOSWindow tell us which view to use.
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
-    m_hasPendingHideRequest = false;
+    [NSObject cancelPreviousPerformRequestsWithTarget:m_focusView selector:@selector(resignFirstResponder) object:nil];
     [m_focusView becomeFirstResponder];
 }
 
 void QIOSInputContext::hideInputPanel()
 {
-    // Delay hiding the keyboard for cases where the user is transferring focus between
-    // 'line edits'. In that case the 'line edit' that lost focus will close the input
-    // panel, just to see that the new 'line edit' will open it again:
-    m_hasPendingHideRequest = true;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (m_hasPendingHideRequest)
-            [m_focusView resignFirstResponder];
-    });
+    // When transferring focus from one item to another, the first will typically tell the keyboard to
+    // hide, while the next will tell it to show. We therefore post the call and cancel it again if
+    // showInputPanel is called in-between.
+    [m_focusView performSelector:@selector(resignFirstResponder) withObject:nil afterDelay:0.01];
 }
 
 bool QIOSInputContext::isInputPanelVisible() const
@@ -325,11 +315,7 @@ void QIOSInputContext::update(Qt::InputMethodQueries query)
 
 void QIOSInputContext::reset()
 {
-    // Since the call to reset will cause a 'keyboardWillHide'
-    // notification to be sendt, we block keyboard nofifications to avoid artifacts:
-    m_keyboardListener->m_ignoreKeyboardChanges = true;
     [m_focusView reset];
-    m_keyboardListener->m_ignoreKeyboardChanges = false;
 }
 
 void QIOSInputContext::commit()
