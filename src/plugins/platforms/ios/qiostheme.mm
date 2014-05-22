@@ -49,6 +49,8 @@
 #include <UIKit/UIFont.h>
 #include <UIKit/UIInterface.h>
 
+#include "qiosmenu.h"
+
 QT_BEGIN_NAMESPACE
 
 const char *QIOSTheme::name = "ios";
@@ -60,6 +62,16 @@ QIOSTheme::QIOSTheme()
 QIOSTheme::~QIOSTheme()
 {
     qDeleteAll(m_fonts);
+}
+
+QPlatformMenuItem* QIOSTheme::createPlatformMenuItem() const
+{
+    return new QIOSMenuItem();
+}
+
+QPlatformMenu* QIOSTheme::createPlatformMenu() const
+{
+    return new QIOSMenu();
 }
 
 QVariant QIOSTheme::themeHint(ThemeHint hint) const
