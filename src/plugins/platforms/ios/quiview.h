@@ -60,6 +60,9 @@ class QIOSWindow;
     NSMutableArray *m_accessibleElements;
 }
 
+@property(readwrite, retain) UIView *inputView;
+@property(readwrite, retain) UIView *inputAccessoryView;
+
 - (id)initWithQIOSWindow:(QIOSWindow *)window;
 - (void)sendUpdatedExposeEvent;
 @end
