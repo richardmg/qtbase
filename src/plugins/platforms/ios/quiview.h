@@ -80,6 +80,8 @@ class QIOSWindow;
 @property(nonatomic) UIKeyboardType keyboardType;
 @property(nonatomic) UIReturnKeyType returnKeyType;
 @property(nonatomic, getter=isSecureTextEntry) BOOL secureTextEntry;
+@property(readwrite, retain) UIView *inputView;
+@property(readwrite, retain) UIView *inputAccessoryView;
 
 - (id)initWithQIOSWindow:(QIOSWindow *)window;
 - (void)sendUpdatedExposeEvent;
