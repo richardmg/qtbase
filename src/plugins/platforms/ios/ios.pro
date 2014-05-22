@@ -27,6 +27,7 @@ OBJECTIVE_SOURCES = \
     qiosclipboard.mm \
     quiaccessibilityelement.mm \
     qiosplatformaccessibility.mm \
+    qiosmenu.mm \
 
 HEADERS = \
     qiosintegration.h \
@@ -46,6 +47,7 @@ HEADERS = \
     qiosclipboard.h \
     quiaccessibilityelement.h \
     qiosplatformaccessibility.h \
+    qiosmenu.h \
 
 OTHER_FILES = \
     quiview_textinput.mm \
