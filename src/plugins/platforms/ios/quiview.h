@@ -89,6 +89,8 @@ class QIOSWindow;
 - (void)updateInputMethodWithQuery:(Qt::InputMethodQueries)query;
 - (void)reset;
 - (void)commit;
+- (void)resignFirstResponderKeepFocus;
++ (void)implementProtocolUITextInput:(bool)implement;
 + (bool)inUpdateKeyboardLayout;
 @end
 

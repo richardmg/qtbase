@@ -257,7 +257,7 @@ QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
-    , m_hasPendingHideRequest(false)
+    , m_keyboardRequestedVisible(false)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -288,8 +288,21 @@ void QIOSInputContext::showInputPanel()
     // responder. Rather than searching for it from the top, we let the active QIOSWindow tell us which view to use.
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
-    m_hasPendingHideRequest = false;
-    [m_focusView becomeFirstResponder];
+    m_keyboardRequestedVisible = true;
+
+    if (m_keyboardListener->m_keyboardVisible)
+        return;
+
+    // We resign/become first responder to "inform" iOS that the first responder (m_focusView) now implements
+    // UITextInput. If we resign/become in the same event loop cycle, iOS will sometimes short-cut the
+    // keyboard animation. So we delay becomeFirstResponder.
+    [m_focusView resignFirstResponderKeepFocus];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (m_keyboardRequestedVisible) {
+            [QUIView implementProtocolUITextInput:true];
+            [m_focusView becomeFirstResponder];
+        }
+    });
 }
 
 void QIOSInputContext::hideInputPanel()
@@ -297,10 +310,20 @@ void QIOSInputContext::hideInputPanel()
     // Delay hiding the keyboard for cases where the user is transferring focus between
     // 'line edits'. In that case the 'line edit' that lost focus will close the input
     // panel, just to see that the new 'line edit' will open it again:
-    m_hasPendingHideRequest = true;
+    m_keyboardRequestedVisible = false;
+
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (m_hasPendingHideRequest)
-            [m_focusView resignFirstResponder];
+        if (!m_keyboardRequestedVisible) {
+            [QUIView implementProtocolUITextInput:false];
+            if ([m_focusView isFirstResponder]) {
+                // We want to close the keyboard, not actually resign first responder
+                // status. There might be other components (e.g QIOSMenu) that expects
+                // us to still be first responder. But we need to tell iOS that we no
+                // longer implement UITextInput, hence the resign/become refresh.
+                [m_focusView resignFirstResponder];
+                [m_focusView becomeFirstResponder];
+            }
+        }
     });
 }
 
@@ -325,8 +348,10 @@ void QIOSInputContext::setFocusObject(QObject *focusObject)
 void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
 {
     QUIView *view = focusWindow ? reinterpret_cast<QUIView *>(focusWindow->handle()->winId()) : 0;
-    if ([m_focusView isFirstResponder])
+    if (m_keyboardRequestedVisible || [m_focusView isFirstResponder]) {
+        [m_focusView resignFirstResponderKeepFocus];
         [view becomeFirstResponder];
+    }
     [m_focusView release];
     m_focusView = [view retain];
 
