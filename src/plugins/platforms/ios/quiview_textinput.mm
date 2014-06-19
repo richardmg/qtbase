@@ -46,11 +46,13 @@ class StaticVariables
 public:
     QInputMethodQueryEvent inputMethodQueryEvent;
     bool inUpdateKeyboardLayout;
+    bool implementProtocolUITextInput;
     QTextCharFormat markedTextFormat;
 
     StaticVariables()
         : inputMethodQueryEvent(Qt::ImQueryInput)
         , inUpdateKeyboardLayout(false)
+        , implementProtocolUITextInput(false)
     {
         // There seems to be no way to query how the preedit text
         // should be drawn. So we need to hard-code the color.
@@ -153,6 +155,30 @@ Q_GLOBAL_STATIC(StaticVariables, staticVariables);
     if (m_qioswindow)
         static_cast<QWindowPrivate *>(QObjectPrivate::get(m_qioswindow->window()))->clearFocusObject();
     return [super resignFirstResponder];
+}
+
+- (void)resignFirstResponderKeepFocus
+{
+    // While resignFirstResponder can be called from anywhere (native controls included)
+    // resignFirstResponderKeepFocus is internal, and is meant to be used whenever we
+    // technically need to resign first responder without disturbing Qts focus status.
+    [super resignFirstResponder];
+}
+
+- (BOOL)conformsToProtocol:(Protocol *)protocol
+{
+    // We choose to dynamically report if we implement UIKeyInput or not. The reason is that
+    // this is what iOS checks for when it determines whether or not to show the keyboard when
+    // this view become first responder. And we only want the keyboard to show if we got an
+    // explicit request from Qt/App to do so.
+    if (protocol == @protocol(UIKeyInput) && !staticVariables()->implementProtocolUITextInput)
+        return NO;
+    return [super conformsToProtocol:protocol];
+}
+
++ (void)implementProtocolUITextInput:(bool)implement
+{
+    staticVariables()->implementProtocolUITextInput = implement;
 }
 
 + (bool)inUpdateKeyboardLayout
