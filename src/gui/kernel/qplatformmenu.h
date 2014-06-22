@@ -66,11 +66,8 @@ Q_OBJECT
 public:
     // copied from, and must stay in sync with, QAction menu roles.
     enum MenuRole { NoRole = 0, TextHeuristicRole, ApplicationSpecificRole, AboutQtRole,
-                    AboutRole, PreferencesRole, QuitRole,
-                    // However these roles are private, perhaps temporarily.
-                    // They could be added as public QAction roles if necessary.
-                    CutRole, CopyRole, PasteRole, SelectAllRole,
-                    RoleCount };
+                    AboutRole, PreferencesRole, QuitRole, CutRole, CopyRole, PasteRole, SelectAllRole,
+                    DeleteRole, RoleCount };
 
     virtual void setTag(quintptr tag) = 0;
     virtual quintptr tag()const = 0;
