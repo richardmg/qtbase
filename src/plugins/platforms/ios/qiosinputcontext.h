@@ -59,6 +59,7 @@ public:
     ~QIOSInputContext();
 
     QRectF keyboardRect() const;
+    bool isAnimating() const;
     void showInputPanel();
     void hideInputPanel();
     bool isInputPanelVisible() const;
@@ -73,10 +74,13 @@ public:
     void reset();
     void commit();
 
+    void setAnimating(bool animating);
+
 private:
     QIOSKeyboardListener *m_keyboardListener;
     QUIView *m_focusView;
     bool m_hasPendingHideRequest;
+    bool m_isAnimating;
 };
 
 QT_END_NAMESPACE
