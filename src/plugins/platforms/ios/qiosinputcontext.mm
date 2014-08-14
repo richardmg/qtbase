@@ -258,6 +258,7 @@ QIOSInputContext::QIOSInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
     , m_keyboardRequestedVisible(false)
+    , m_isAnimating(false)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -273,6 +274,11 @@ QIOSInputContext::~QIOSInputContext()
 QRectF QIOSInputContext::keyboardRect() const
 {
     return m_keyboardListener->m_keyboardRect;
+}
+
+bool QIOSInputContext::isAnimating() const
+{
+   return m_isAnimating;
 }
 
 void QIOSInputContext::showInputPanel()
@@ -413,12 +419,17 @@ void QIOSInputContext::scroll(int y)
     CGRect newBounds = view.bounds;
     newBounds.origin.y = y;
     QPointer<QIOSInputContext> self = this;
+    m_isAnimating = true;
+    emitAnimatingChanged();
     [UIView animateWithDuration:m_keyboardListener->m_duration delay:0
         options:m_keyboardListener->m_curve | UIViewAnimationOptionBeginFromCurrentState
         animations:^{ view.bounds = newBounds; }
         completion:^(BOOL){
-            if (self)
+            if (self) {
+                m_isAnimating = false;
+                emitAnimatingChanged();
                 [m_keyboardListener handleKeyboardRectChanged];
+            }
         }
     ];
 }
