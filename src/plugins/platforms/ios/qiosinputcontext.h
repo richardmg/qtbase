@@ -68,6 +68,7 @@ public:
 
     QRectF keyboardRect() const;
 
+    bool isAnimating() const;
     void showInputPanel();
     void hideInputPanel();
     void hideVirtualKeyboard();
@@ -85,11 +86,13 @@ public:
     void commit();
 
     const ImeState &imeState() { return m_imeState; };
+    void setAnimating(bool animating);
 
 private:
     QIOSKeyboardListener *m_keyboardListener;
     QIOSTextInputResponder *m_textResponder;
     ImeState m_imeState;
+    bool m_isAnimating;
 };
 
 QT_END_NAMESPACE

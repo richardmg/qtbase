@@ -156,6 +156,7 @@
     // change (normally caused by an orientation change). In that case, update scroll:
     if (m_keyboardVisibleAndDocked)
         m_context->scrollToCursor();
+    m_context->setAnimating(false);
 }
 
 - (void) keyboardWillShow:(NSNotification *)notification
@@ -169,6 +170,7 @@
         m_curve = UIViewAnimationCurve([[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue]);
     }
     m_context->scrollToCursor();
+    m_context->setAnimating(true);
 }
 
 - (void) keyboardWillHide:(NSNotification *)notification
@@ -182,6 +184,7 @@
         self.enabled = NO;
     }
     m_context->scroll(0);
+    m_context->setAnimating(true);
 }
 
 - (void) handleKeyboardRectChanged
@@ -288,6 +291,7 @@ QIOSInputContext::QIOSInputContext()
     : QPlatformInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_textResponder(0)
+    , m_isAnimating(false)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -302,6 +306,11 @@ QIOSInputContext::~QIOSInputContext()
 QRectF QIOSInputContext::keyboardRect() const
 {
     return m_keyboardListener->m_keyboardRect;
+}
+
+bool QIOSInputContext::isAnimating() const
+{
+   return m_isAnimating;
 }
 
 void QIOSInputContext::showInputPanel()
@@ -380,12 +389,14 @@ void QIOSInputContext::scroll(int y)
     CGRect newBounds = view.bounds;
     newBounds.origin.y = y;
     QPointer<QIOSInputContext> self = this;
+    setAnimating(true);
     [UIView animateWithDuration:m_keyboardListener->m_duration delay:0
         options:(m_keyboardListener->m_curve << 16) | UIViewAnimationOptionBeginFromCurrentState
         animations:^{ view.bounds = newBounds; }
         completion:^(BOOL){
             if (self)
                 [m_keyboardListener handleKeyboardRectChanged];
+            setAnimating(false);
         }
     ];
 }
@@ -453,6 +464,14 @@ void QIOSInputContext::commit()
 {
     [m_textResponder unmarkText];
     [m_textResponder notifyInputDelegate:Qt::ImSurroundingText];
+}
+
+void QIOSInputContext::setAnimating(bool animating)
+{
+    if (animating == m_isAnimating)
+        return;
+    m_isAnimating = animating;
+    emitAnimatingChanged();
 }
 
 // -------------------------------------------------------------------------
