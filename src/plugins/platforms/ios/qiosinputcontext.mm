@@ -154,6 +154,7 @@
     // change (normally caused by an orientation change). In that case, update scroll:
     if (m_keyboardVisibleAndDocked)
         m_context->scrollToCursor();
+    m_context->setAnimating(false);
 }
 
 - (void) keyboardWillShow:(NSNotification *)notification
@@ -167,6 +168,7 @@
         m_curve = UIViewAnimationCurve([[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue] << 16);
     }
     m_context->scrollToCursor();
+    m_context->setAnimating(true);
 }
 
 - (void) keyboardWillHide:(NSNotification *)notification
@@ -180,6 +182,7 @@
         self.enabled = NO;
     }
     m_context->scroll(0);
+    m_context->setAnimating(true);
 }
 
 - (void) handleKeyboardRectChanged
@@ -254,6 +257,7 @@ QIOSInputContext::QIOSInputContext()
     , m_keyboardListener([[QIOSKeyboardListener alloc] initWithQIOSInputContext:this])
     , m_focusView(0)
     , m_hasPendingHideRequest(false)
+    , m_isAnimating(false)
 {
     if (isQtApplication())
         connect(qGuiApp->inputMethod(), &QInputMethod::cursorRectangleChanged, this, &QIOSInputContext::cursorRectangleChanged);
@@ -269,6 +273,11 @@ QIOSInputContext::~QIOSInputContext()
 QRectF QIOSInputContext::keyboardRect() const
 {
     return m_keyboardListener->m_keyboardRect;
+}
+
+bool QIOSInputContext::isAnimating() const
+{
+   return m_isAnimating;
 }
 
 void QIOSInputContext::showInputPanel()
@@ -382,12 +391,14 @@ void QIOSInputContext::scroll(int y)
     CGRect newBounds = view.bounds;
     newBounds.origin.y = y;
     QPointer<QIOSInputContext> self = this;
+    setAnimating(true);
     [UIView animateWithDuration:m_keyboardListener->m_duration delay:0
         options:m_keyboardListener->m_curve | UIViewAnimationOptionBeginFromCurrentState
         animations:^{ view.bounds = newBounds; }
         completion:^(BOOL){
             if (self)
                 [m_keyboardListener handleKeyboardRectChanged];
+            setAnimating(false);
         }
     ];
 }
@@ -405,5 +416,13 @@ void QIOSInputContext::reset()
 void QIOSInputContext::commit()
 {
     [m_focusView commit];
+}
+
+void QIOSInputContext::setAnimating(bool animating)
+{
+    if (animating == m_isAnimating)
+        return;
+    m_isAnimating = animating;
+    emitAnimatingChanged();
 }
 
