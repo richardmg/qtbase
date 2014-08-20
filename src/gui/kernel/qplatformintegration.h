@@ -98,7 +98,8 @@ public:
         WindowManagement,
         SyncState,
         RasterGLSurface,
-        AllGLFunctionsQueryable
+        AllGLFunctionsQueryable,
+        AutoSIP
     };
 
     virtual ~QPlatformIntegration() { }

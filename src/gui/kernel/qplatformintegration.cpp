@@ -239,6 +239,9 @@ QPlatformServices *QPlatformIntegration::services() const
     implementation for QOpenGLContext::getProcAddress() and support returning a function
     pointer also for the standard, non-extension functions. This capability is a
     prerequisite for dynamic OpenGL loading.
+
+    \value AutoSIP The platform handles automatic SIP (software input panel) visibility.
+    This means that calling QInputMethod::show() or QInputMethod::hide() will have no effect.
  */
 
 /*!

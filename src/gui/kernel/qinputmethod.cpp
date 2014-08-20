@@ -41,6 +41,7 @@
 
 #include <qinputmethod.h>
 #include <private/qinputmethod_p.h>
+#include <private/qguiapplication_p.h>
 #include <qguiapplication.h>
 #include <qtimer.h>
 #include <qpa/qplatforminputcontext_p.h>
@@ -177,6 +178,10 @@ QRectF QInputMethod::keyboardRectangle() const
 void QInputMethod::show()
 {
     Q_D(QInputMethod);
+
+    if (QGuiApplicationPrivate::platformIntegration()->hasCapability(QPlatformIntegration::AutoSIP))
+        return;
+
     QPlatformInputContext *ic = d->platformInputContext();
     if (ic)
         ic->showInputPanel();
@@ -192,6 +197,10 @@ void QInputMethod::show()
 void QInputMethod::hide()
 {
     Q_D(QInputMethod);
+
+    if (QGuiApplicationPrivate::platformIntegration()->hasCapability(QPlatformIntegration::AutoSIP))
+        return;
+
     QPlatformInputContext *ic = d->platformInputContext();
     if (ic)
         ic->hideInputPanel();
