@@ -53,10 +53,11 @@
             g_currentMenu->menuItemSelected(index); \
     }
 
-// You can only have one menu open at a time
+// g_currentMenu points to the popup currently
+// executing (only one popup should be open at a time)
 static QIOSMenu *g_currentMenu = 0;
 
-@interface QIOSMenuActionTarget : UIResponder
+@interface QIOSMenuActionTarget : UIResponder <UIActionSheetDelegate>
 @end
 
 @implementation QIOSMenuActionTarget
@@ -99,7 +100,23 @@ QIOS_MENUITEM_ACTION(19)
 
 @end
 
+@interface QIOSMenuActionSheetDelegate : NSObject <UIActionSheetDelegate>
+@end
+
+@implementation QIOSMenuActionSheetDelegate
+
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)index
+{
+    // Called when using UIActionSheet
+    Q_UNUSED(actionSheet);
+    if (g_currentMenu)
+        g_currentMenu->menuItemSelected(index);
+}
+
+@end
+
 UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
+NSObject <UIActionSheetDelegate> *QIOSMenu::m_actionSheetDelegate = [[QIOSMenuActionSheetDelegate alloc] init];
 
 QIOSMenuItem::QIOSMenuItem()
     : QPlatformMenuItem()
@@ -146,7 +163,12 @@ QIOSMenu::QIOSMenu()
     , m_tag(0)
     , m_enabled(true)
     , m_visible(false)
+    , m_effectiveVisible(false)
+    , m_text(QString())
+    , m_menuType(DefaultMenu)
+    , m_effectiveMenuType(DefaultMenu)
     , m_targetRect(QRect(qGuiApp->primaryScreen()->availableGeometry().center(), QSize()))
+    , m_actionSheet(0)
 {
     connect(qGuiApp->inputMethod(), &QInputMethod::animatingChanged, this, &QIOSMenu::rootViewGeometryChanged);
 }
@@ -176,13 +198,21 @@ void QIOSMenu::setTag(quintptr tag)
 
 quintptr QIOSMenu::tag() const
 {
-   return m_tag;
+    return m_tag;
+}
+
+void QIOSMenu::setText(const QString &text)
+{
+   m_text = text;
 }
 
 void QIOSMenu::setEnabled(bool enabled)
 {
+    if (m_enabled == enabled)
+        return;
+
     m_enabled = enabled;
-    setVisible(m_visible);
+    updateVisibility();
 }
 
 void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, const QPlatformMenuItem *item)
@@ -199,10 +229,40 @@ void QIOSMenu::dismiss()
 
 void QIOSMenu::setVisible(bool visible)
 {
+    if (m_visible == visible)
+        return;
+
     m_visible = visible;
+    updateVisibility();
+}
+
+void QIOSMenu::updateVisibility()
+{
+    bool visibleAndEnabled = m_visible && m_enabled;
+    if ((visibleAndEnabled && m_effectiveVisible) || (!visibleAndEnabled && g_currentMenu != this))
+        return;
+
+    m_effectiveVisible = visibleAndEnabled;
+    if (m_effectiveVisible)
+        m_effectiveMenuType = m_menuType;
+
+    if (m_effectiveMenuType == EditMenu)
+        updateVisibilityUsingUIMenuController();
+    else
+        updateVisibilityUsingUIActionSheet();
+
+}
+
+void QIOSMenu::setMenuType(QPlatformMenu::MenuType type)
+{
+    m_menuType = type;
+}
+
+void QIOSMenu::updateVisibilityUsingUIMenuController()
+{
     UIMenuController *menuController = [UIMenuController sharedMenuController];
 
-    if (m_enabled && m_visible) {
+    if (m_effectiveVisible) {
         // Create an array of UIMenuItems, one for each QIOSMenuItem in the QMenu. Each
         // UIMenuItem needs a callback assigned, so we assign one of the placeholder methods
         // added to QIOSMenuActionTarget. Each method knows its own index, which corresponds
@@ -234,7 +294,7 @@ void QIOSMenu::setVisible(bool visible)
             [menuController setMenuVisible:YES animated:YES];
         }
         g_currentMenu = this;
-    } else if (g_currentMenu == this) {
+    } else {
         // Only hide UIMenuController if this menu was the last one to show it
         emit aboutToHide();
         [menuController setMenuVisible:NO animated:YES];
@@ -242,15 +302,48 @@ void QIOSMenu::setVisible(bool visible)
     }
 }
 
+void QIOSMenu::updateVisibilityUsingUIActionSheet()
+{
+    if (m_effectiveVisible) {
+        g_currentMenu = this;
+
+        Q_ASSERT(!m_actionSheet);
+        m_actionSheet = [[UIActionSheet alloc]
+            initWithTitle: m_text.isEmpty() ? nil : m_text.toNSString()
+            delegate:m_actionSheetDelegate
+            cancelButtonTitle:nil
+            destructiveButtonTitle:nil
+            otherButtonTitles:nil];
+
+        // Add buttons using the exact same index as listed in m_menuItems:
+        for (int i = 0; i < m_menuItems.count(); ++i) {
+            QIOSMenuItem *item = static_cast<QIOSMenuItem *>(m_menuItems.at(i));
+            if (!item->m_enabled || !item->m_visible)
+                continue;
+            [m_actionSheet addButtonWithTitle:item->m_text.toNSString()];
+        }
+
+        UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
+        [m_actionSheet showFromRect:toCGRect(m_targetRect) inView:view animated:YES];
+    } else {
+        Q_ASSERT(m_actionSheet);
+        emit aboutToHide();
+        [m_actionSheet release];
+        m_actionSheet = 0;
+    }
+}
+
 void QIOSMenu::rootViewGeometryChanged()
 {
-    if (!m_enabled || !m_visible)
+    if (!m_effectiveVisible)
         return;
 
-    UIMenuController *menuController = [UIMenuController sharedMenuController];
-    UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
-    [menuController setTargetRect:toCGRect(m_targetRect) inView:view];
-    [menuController setMenuVisible:YES animated:YES];
+    if (m_effectiveMenuType == EditMenu) {
+        UIMenuController *menuController = [UIMenuController sharedMenuController];
+        UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
+        [menuController setTargetRect:toCGRect(m_targetRect) inView:view];
+        [menuController setMenuVisible:YES animated:YES];
+    }
 }
 
 QPlatformMenuItem *QIOSMenu::menuItemAt(int position) const

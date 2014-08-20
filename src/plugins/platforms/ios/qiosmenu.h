@@ -93,10 +93,11 @@ public:
     void setTag(quintptr tag) Q_DECL_OVERRIDE;
     quintptr tag()const Q_DECL_OVERRIDE;
 
-    void setText(const QString &) Q_DECL_OVERRIDE {}
+    void setText(const QString &) Q_DECL_OVERRIDE;
     void setIcon(const QIcon &) Q_DECL_OVERRIDE {}
     void setEnabled(bool enabled) Q_DECL_OVERRIDE;
     void setVisible(bool visible) Q_DECL_OVERRIDE;
+    void setMenuType(MenuType type) Q_DECL_OVERRIDE;
 
     void showPopup(const QWindow *parentWindow, const QRect &targetRect, const QPlatformMenuItem *item) Q_DECL_OVERRIDE;
     void dismiss() Q_DECL_OVERRIDE;
@@ -111,10 +112,19 @@ private:
     quintptr m_tag;
     bool m_enabled;
     bool m_visible;
+    bool m_effectiveVisible;
+    QString m_text;
+    MenuType m_menuType;
+    MenuType m_effectiveMenuType;
     QRect m_targetRect;
+    UIActionSheet *m_actionSheet;
     QIOSMenuItemList m_menuItems;
     static UIResponder *m_menuActionTarget;
+    static NSObject <UIActionSheetDelegate> *m_actionSheetDelegate;
 
+    void updateVisibility();
+    void updateVisibilityUsingUIMenuController();
+    void updateVisibilityUsingUIActionSheet();
     void rootViewGeometryChanged();
 };
 
