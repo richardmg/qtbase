@@ -139,6 +139,8 @@ bool QIOSIntegration::hasCapability(Capability cap) const
         return false;
     case ApplicationState:
         return true;
+    case AutoSIP:
+        return true;
     default:
         return QPlatformIntegration::hasCapability(cap);
     }

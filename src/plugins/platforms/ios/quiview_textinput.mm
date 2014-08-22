@@ -40,6 +40,7 @@
 ****************************************************************************/
 
 #include "qiosinputcontext.h"
+#include "qiosintegration.h"
 
 #include <QtGui/qtextformat.h>
 #include <QtGui/private/qguiapplication_p.h>
@@ -48,7 +49,6 @@ class StaticVariables
 {
 public:
     QInputMethodQueryEvent inputMethodQueryEvent;
-    bool inUpdateKeyboardLayout;
 
     StaticVariables()
         : inputMethodQueryEvent(Qt::ImQueryInput)
@@ -126,46 +126,27 @@ Q_GLOBAL_STATIC(StaticVariables, staticVariables);
 
 @implementation QUIView (TextInput)
 
-- (BOOL)canBecomeFirstResponder
-{
-    return YES;
-}
-
-- (BOOL)becomeFirstResponder
-{
-    // Note: QIOSInputContext controls our first responder status based on
-    // whether or not the keyboard should be open or closed.
-    [self updateTextInputTraits];
-    return [super becomeFirstResponder];
-}
-
-- (BOOL)resignFirstResponder
-{
-    // Resigning first responed status means that the virtual keyboard was closed, or
-    // some other view became first responder. In either case we clear the focus object to
-    // avoid blinking cursors in line edits etc:
-    if (m_qioswindow)
-        static_cast<QWindowPrivate *>(QObjectPrivate::get(m_qioswindow->window()))->clearFocusObject();
-    return [super resignFirstResponder];
-}
-
-+ (bool)inUpdateKeyboardLayout
-{
-    return staticVariables()->inUpdateKeyboardLayout;
-}
-
 - (void)updateKeyboardLayout
 {
     if (![self isFirstResponder])
         return;
 
-    // There seems to be no API to inform that the keyboard layout needs to update.
-    // As a work-around, we quickly resign first responder just to reassign it again.
-    QScopedValueRollback<bool> rollback(staticVariables()->inUpdateKeyboardLayout);
-    staticVariables()->inUpdateKeyboardLayout = true;
-    [super resignFirstResponder];
-    [self updateTextInputTraits];
-    [super becomeFirstResponder];
+    [self reloadInputViews];
+}
+
+/*!
+    iOS uses [UIResponder(Internal) _requiresKeyboardWhenFirstResponder] to check if the
+    current responder should bring up the keyboard, which in turn checks if the responder
+    supports the UIKeyInput protocol. By dynamically reporting our protocol conformance
+    we can control the keyboard visibility depending on whether or not we have a focus
+    object with IME enabled.
+*/
+- (BOOL)conformsToProtocol:(Protocol *)protocol
+{
+    if (protocol == @protocol(UIKeyInput))
+        return static_cast<QIOSInputContext *>(QIOSIntegration::instance()->inputContext())->inputMethodAccepted();
+
+    return [super conformsToProtocol:protocol];
 }
 
 - (void)updateUITextInputDelegate:(Qt::InputMethodQueries)query

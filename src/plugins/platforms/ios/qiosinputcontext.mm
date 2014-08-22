@@ -158,8 +158,6 @@
 
 - (void) keyboardWillShow:(NSNotification *)notification
 {
-    if ([QUIView inUpdateKeyboardLayout])
-        return;
     // Note that UIKeyboardWillShowNotification is only sendt when the keyboard is docked.
     m_keyboardVisibleAndDocked = YES;
     m_keyboardEndRect = [self getKeyboardRect:notification];
@@ -173,8 +171,6 @@
 
 - (void) keyboardWillHide:(NSNotification *)notification
 {
-    if ([QUIView inUpdateKeyboardLayout])
-        return;
     // Note that UIKeyboardWillHideNotification is also sendt when the keyboard is undocked.
     m_keyboardVisibleAndDocked = NO;
     m_keyboardEndRect = [self getKeyboardRect:notification];
@@ -283,13 +279,10 @@ void QIOSInputContext::showInputPanel()
         return;
     }
 
-    // Documentation tells that one should call (and recall, if necessary) becomeFirstResponder/resignFirstResponder
-    // to show/hide the keyboard. This is slightly inconvenient, since there exist no API to get the current first
-    // responder. Rather than searching for it from the top, we let the active QIOSWindow tell us which view to use.
     // Note that Qt will forward keyevents to whichever QObject that needs it, regardless of which UIView the input
     // actually came from. So in this respect, we're undermining iOS' responder chain.
     m_hasPendingHideRequest = false;
-    [m_focusView becomeFirstResponder];
+    [m_focusView reloadInputViews];
 }
 
 void QIOSInputContext::hideInputPanel()
@@ -300,7 +293,7 @@ void QIOSInputContext::hideInputPanel()
     m_hasPendingHideRequest = true;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (m_hasPendingHideRequest)
-            [m_focusView resignFirstResponder];
+            static_cast<QWindowPrivate *>(QObjectPrivate::get(qApp->focusWindow()))->clearFocusObject();
     });
 }
 
@@ -325,10 +318,11 @@ void QIOSInputContext::setFocusObject(QObject *focusObject)
 void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
 {
     QUIView *view = focusWindow ? reinterpret_cast<QUIView *>(focusWindow->handle()->winId()) : 0;
-    if ([m_focusView isFirstResponder])
-        [view becomeFirstResponder];
+    [m_focusView reloadInputViews];
     [m_focusView release];
+
     m_focusView = [view retain];
+    [m_focusView reloadInputViews];
 
     if (view.window != m_keyboardListener->m_viewController.view)
         scroll(0);
