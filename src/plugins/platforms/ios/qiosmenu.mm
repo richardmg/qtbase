@@ -123,7 +123,9 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 
 // -------------------------------------------------------------------------
 
-@interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource>
+@interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource> {
+    NSInteger m_selectedRow;
+}
 @end
 
 @implementation QUIPickerView
@@ -162,7 +164,12 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 {
     Q_UNUSED(pickerView);
     Q_UNUSED(component);
-    return g_currentMenu->menuItemSelected(row);
+    m_selectedRow = row;
+}
+
+- (void)closeMenu
+{
+    g_currentMenu->menuItemSelected(m_selectedRow);
 }
 
 @end
@@ -219,6 +226,7 @@ QIOSMenu::QIOSMenu()
     , m_menuType(DefaultMenu)
     , m_effectiveMenuType(DefaultMenu)
     , m_targetRect(QRect(qGuiApp->primaryScreen()->availableGeometry().center(), QSize()))
+    , m_targetIndex(0)
     , m_actionSheet(0)
     , m_pickerView(0)
 {
@@ -271,8 +279,13 @@ void QIOSMenu::setEnabled(bool enabled)
 
 void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, const QPlatformMenuItem *item)
 {
-    Q_UNUSED(item);
     m_targetRect = QRect(parentWindow->mapToGlobal(targetRect.topLeft()), targetRect.size());
+
+    for (m_targetIndex = m_menuItems.count() - 1; m_targetIndex >= 0; --m_targetIndex) {
+        if (item == m_menuItems.at(m_targetIndex))
+            break;
+    }
+
     setVisible(true);
 }
 
@@ -398,13 +411,25 @@ void QIOSMenu::updateVisibilityUsingUIPickerView()
         if (QWindow *window = qGuiApp->focusWindow()) {
             QUIView *view = reinterpret_cast<QUIView *>(window->winId());
             view.inputView = m_pickerView;
+
+            UIToolbar *toolbar = [[[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 320, 44)] autorelease];
+            UIBarButtonItem *doneButton = [[[UIBarButtonItem alloc]
+                initWithBarButtonSystemItem: UIBarButtonSystemItemDone
+                target:m_pickerView action:@selector(closeMenu)] autorelease];
+            [toolbar setItems:[NSArray arrayWithObject:doneButton]];
+            view.inputAccessoryView = toolbar;
+
+            [m_pickerView selectRow:m_targetIndex inComponent:0 animated:false];
+
             [view reloadInputViews];
         }
     } else {
         if (QWindow *window = qGuiApp->focusWindow()) {
             QUIView *view = reinterpret_cast<QUIView *>(window->winId());
-            if (view.inputView == m_pickerView)
+            if (view.inputView == m_pickerView) {
                 view.inputView = 0;
+                view.inputAccessoryView = 0;
+            }
             [view reloadInputViews];
         }
         // Give the keyboard a chance to close before deleting the picker view:
