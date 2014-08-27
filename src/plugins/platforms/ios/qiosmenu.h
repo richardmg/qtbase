@@ -118,6 +118,7 @@ private:
     MenuType m_menuType;
     MenuType m_effectiveMenuType;
     QRect m_targetRect;
+    int m_targetIndex;
     UIActionSheet *m_actionSheet;
     QUIPickerView *m_pickerView;
     QList<QIOSMenuItem *> m_menuItems;
