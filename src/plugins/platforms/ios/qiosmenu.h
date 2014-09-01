@@ -49,6 +49,8 @@
 
 #import "quiview.h"
 
+@class QUIMenuControllerActionTarget;
+@class QUIActionSheet;
 @class QUIPickerView;
 
 class QIOSMenuItem : public QPlatformMenuItem
@@ -78,6 +80,8 @@ public:
     bool m_enabled;
 };
 
+typedef QList<QIOSMenuItem *> QIOSMenuItemList;
+
 class QIOSMenu : public QPlatformMenu
 {
 public:
@@ -104,9 +108,8 @@ public:
     QPlatformMenuItem *menuItemAt(int position) const Q_DECL_OVERRIDE;
     QPlatformMenuItem *menuItemForTag(quintptr tag) const Q_DECL_OVERRIDE;
 
-    static UIResponder *menuActionTarget() { return m_menuActionTarget; }
+    static UIResponder *menuActionTarget();
     void menuItemSelected(QIOSMenuItem *menuItem);
-    void menuItemSelected(int index);
 
 private:
     quintptr m_tag;
@@ -118,15 +121,18 @@ private:
     MenuType m_effectiveMenuType;
     QRect m_targetRect;
     const QIOSMenuItem *m_targetItem;
-    UIActionSheet *m_actionSheet;
+    QUIMenuControllerActionTarget *m_menuActionTarget;
+    QUIActionSheet *m_actionSheet;
     QUIPickerView *m_pickerView;
-    QList<QIOSMenuItem *> m_menuItems;
-    static UIResponder *m_menuActionTarget;
+    QIOSMenuItemList m_menuItems;
+
+    static QIOSMenu *m_currentMenu;
 
     void updateVisibility();
     void updateVisibilityUsingUIMenuController();
     void updateVisibilityUsingUIActionSheet();
     void updateVisibilityUsingUIPickerView();
+    QIOSMenuItemList visibleMenuItems();
     void rootViewGeometryChanged();
 };
 

@@ -56,18 +56,43 @@ static QIOSMenu *g_currentMenu = 0;
     - (void)_qtMenuItem_ ## index \
     { \
         if (g_currentMenu) \
-            g_currentMenu->menuItemSelected(index); \
+            g_currentMenu->menuItemSelected(m_visibleMenuItems.at(index)); \
     }
 
-@interface QIOSMenuActionTarget : UIResponder <UIActionSheetDelegate>
+@interface QUIMenuControllerActionTarget : UIResponder {
+    QIOSMenuItemList m_visibleMenuItems;
+}
 @end
 
-@implementation QIOSMenuActionTarget
+@implementation QUIMenuControllerActionTarget
+
+- (id)initWithVisibleMenuItems:(QIOSMenuItemList)visibleMenuItems
+{
+    if (self = [super init]) {
+        m_visibleMenuItems = visibleMenuItems;
+        NSMutableArray *menuItemArray = [NSMutableArray arrayWithCapacity:m_visibleMenuItems.size()];
+        // Create an array of UIMenuItems, one for each visible QIOSMenuItem. Each
+        // UIMenuItem needs a callback assigned, so we assign one of the placeholder methods
+        // added to this class. Each method knows its own index, which corresponds
+        // to the index of the corresponding QIOSMenuItem in m_visibleMenuItems.
+        for (int i = 0; i < m_visibleMenuItems.count(); ++i) {
+            QIOSMenuItem *item = m_visibleMenuItems.at(i);
+            SEL sel = NSSelectorFromString([NSString stringWithFormat:@"_qtMenuItem_%i", i]);
+            [menuItemArray addObject:[[[UIMenuItem alloc] initWithTitle:item->m_text.toNSString() action:sel] autorelease]];
+        }
+        [UIMenuController sharedMenuController].menuItems = menuItemArray;
+    }
+
+    return self;
+}
 
 - (id)targetForAction:(SEL)action withSender:(id)sender
 {
     Q_UNUSED(sender);
-
+    // iOS will determine which items in the the menu to show by calling (for each selector)
+    // "- (id)targetForAction:(SEL)action withSender:(id)sender" up the responder chain. If no one
+    // returns a target, the menu will not show. Implementations of this method is found inside
+    // QUIWindow and QUIView, where both just forward the to this method.
     if ([self respondsToSelector:action])
         return self;
 
@@ -103,20 +128,37 @@ QIOS_MENUITEM_ACTION(19)
 
 @end
 
-UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
-
 // -------------------------------------------------------------------------
 
-@interface QIOSMenuActionSheetDelegate : NSObject <UIActionSheetDelegate>
+@interface QUIActionSheet : UIActionSheet <UIActionSheetDelegate>{
+    QIOSMenuItemList m_visibleMenuItems;
+}
 @end
 
-@implementation QIOSMenuActionSheetDelegate
+@implementation QUIActionSheet
+
+- (id)initWithVisibleMenuItems:(QIOSMenuItemList)visibleMenuItems title:(QString)title
+{
+    self = [super initWithTitle:title.isEmpty() ? nil : title.toNSString()
+        delegate:self
+        cancelButtonTitle:nil
+        destructiveButtonTitle:nil
+        otherButtonTitles:nil];
+
+    if (self) {
+        m_visibleMenuItems = visibleMenuItems;
+        for (int i = 0; i < visibleMenuItems.count(); ++i)
+            [self addButtonWithTitle:m_visibleMenuItems.at(i)->m_text.toNSString()];
+    }
+
+    return self;
+}
 
 - (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)index
 {
     Q_UNUSED(actionSheet);
     if (g_currentMenu)
-        g_currentMenu->menuItemSelected(index);
+        g_currentMenu->menuItemSelected(m_visibleMenuItems.at(index));
 }
 
 @end
@@ -124,21 +166,24 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 // -------------------------------------------------------------------------
 
 @interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource> {
-    QList<QIOSMenuItem *> m_visibleMenuItems;
+    QIOSMenuItemList m_visibleMenuItems;
     NSInteger m_selectedRow;
 }
 @end
 
 @implementation QUIPickerView
 
-- (id)initWithVisibleMenuItems:(QList<QIOSMenuItem *>)visibleMenuItems selectRow:(NSInteger)selectRow
+- (id)initWithVisibleMenuItems:(QIOSMenuItemList)visibleMenuItems selectItem:(const QIOSMenuItem *)selectItem
 {
     if (self = [super init]) {
         m_visibleMenuItems = visibleMenuItems;
-        m_selectedRow = selectRow;
+        m_selectedRow = visibleMenuItems.indexOf(const_cast<QIOSMenuItem *>(selectItem));
+        if (m_selectedRow == -1)
+            m_selectedRow = 0;
+
         [self setDelegate:self];
         [self setDataSource:self];
-        [self selectRow:selectRow inComponent:0 animated:false];
+        [self selectRow:m_selectedRow inComponent:0 animated:false];
     }
 
     return self;
@@ -174,7 +219,7 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 - (void)closeMenu
 {
     if (m_visibleMenuItems.isEmpty())
-        g_currentMenu->menuItemSelected(-1);
+        g_currentMenu->setVisible(false);
     else
         g_currentMenu->menuItemSelected(m_visibleMenuItems.at(m_selectedRow));
 }
@@ -234,6 +279,7 @@ QIOSMenu::QIOSMenu()
     , m_effectiveMenuType(DefaultMenu)
     , m_targetRect(QRect(qGuiApp->primaryScreen()->availableGeometry().center(), QSize()))
     , m_targetItem(0)
+    , m_menuActionTarget(0)
     , m_actionSheet(0)
     , m_pickerView(0)
 {
@@ -346,35 +392,20 @@ void QIOSMenu::updateVisibilityUsingUIMenuController()
     UIMenuController *menuController = [UIMenuController sharedMenuController];
 
     if (m_effectiveVisible) {
-        // Create an array of UIMenuItems, one for each QIOSMenuItem in the QMenu. Each
-        // UIMenuItem needs a callback assigned, so we assign one of the placeholder methods
-        // added to QIOSMenuActionTarget. Each method knows its own index, which corresponds
-        // to the index of the corresponding QIOSMenuItem in m_menuItems, and will call
-        // QIOSMenu::menuItemSelected(int index) with it as argument upon trigger.
-        NSMutableArray *menuItemArray = [NSMutableArray arrayWithCapacity:m_menuItems.size()];
-        for (int i = 0; i < m_menuItems.count(); ++i) {
-            QIOSMenuItem *item = m_menuItems.at(i);
-            if (!item->m_enabled || !item->m_visible)
-                continue;
-            SEL sel = NSSelectorFromString([NSString stringWithFormat:@"_qtMenuItem_%i", i]);
-            [menuItemArray addObject:[[[UIMenuItem alloc] initWithTitle:item->m_text.toNSString() action:sel] autorelease]];
-        }
-
-        menuController.menuItems = menuItemArray;
+        Q_ASSERT(!m_menuActionTarget);
+        m_menuActionTarget = [[QUIMenuControllerActionTarget alloc] initWithVisibleMenuItems:visibleMenuItems()];
         UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
         [menuController setTargetRect:toCGRect(m_targetRect) inView:view];
 
-        // iOS will determine which items in the the menu to show by calling (for each selector)
-        // "- (id)targetForAction:(SEL)action withSender:(id)sender" up the responder chain. If no one
-        // returns a target, the menu will not show. Implementations of this method is found inside
-        // QUIWindow and QUIView, where both just forward the call to QIOSMenuActionTarget.
-
         if (QWindow *w = qGuiApp->focusWindow()) {
+            // The first responder will get the menu action callbacks, so we need to set it:
             [reinterpret_cast<UIView *>(w->winId()) becomeFirstResponder];
             [menuController setMenuVisible:YES animated:YES];
         }
     } else {
+        Q_ASSERT(m_menuActionTarget);
         [menuController setMenuVisible:NO animated:YES];
+        [m_menuActionTarget release];
     }
 }
 
@@ -382,21 +413,7 @@ void QIOSMenu::updateVisibilityUsingUIActionSheet()
 {
     if (m_effectiveVisible) {
         Q_ASSERT(!m_actionSheet);
-        m_actionSheet = [[UIActionSheet alloc]
-            initWithTitle: m_text.isEmpty() ? nil : m_text.toNSString()
-            delegate:[[[QIOSMenuActionSheetDelegate alloc] init] autorelease]
-            cancelButtonTitle:nil
-            destructiveButtonTitle:nil
-            otherButtonTitles:nil];
-
-        // Add buttons using the exact same index as listed in m_menuItems:
-        for (int i = 0; i < m_menuItems.count(); ++i) {
-            QIOSMenuItem *item = m_menuItems.at(i);
-            if (!item->m_enabled || !item->m_visible)
-                continue;
-            [m_actionSheet addButtonWithTitle:item->m_text.toNSString()];
-        }
-
+        m_actionSheet = [[QUIActionSheet alloc] initWithVisibleMenuItems:visibleMenuItems() title:m_text];
         UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
         [m_actionSheet showFromRect:toCGRect(m_targetRect) inView:view animated:YES];
     } else {
@@ -409,20 +426,8 @@ void QIOSMenu::updateVisibilityUsingUIActionSheet()
 void QIOSMenu::updateVisibilityUsingUIPickerView()
 {
     if (m_effectiveVisible) {
-        int selectRow = 0;
-        QList<QIOSMenuItem *> visibleMenuItems;
-        visibleMenuItems.reserve(m_menuItems.size());
-
-        for (int i = 0; i < m_menuItems.count(); ++i) {
-            QIOSMenuItem *item = m_menuItems.at(i);
-            if (!item->m_enabled || !item->m_visible)
-                continue;
-            visibleMenuItems.append(item);
-            if (item == m_targetItem)
-                selectRow = i;
-        }
-
-        m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:visibleMenuItems selectRow:selectRow];
+        Q_ASSERT(!m_pickerView);
+        m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:visibleMenuItems() selectItem:m_targetItem];
 
         if (QWindow *window = qGuiApp->focusWindow()) {
             QUIView *view = reinterpret_cast<QUIView *>(window->winId());
@@ -437,6 +442,7 @@ void QIOSMenu::updateVisibilityUsingUIPickerView()
             [view reloadInputViews];
         }
     } else {
+        Q_ASSERT(m_pickerView);
         if (QWindow *window = qGuiApp->focusWindow()) {
             QUIView *view = reinterpret_cast<QUIView *>(window->winId());
             if (view.inputView == m_pickerView) {
@@ -449,6 +455,26 @@ void QIOSMenu::updateVisibilityUsingUIPickerView()
         [m_pickerView performSelector:@selector(release) withObject:0 afterDelay:2.0];
         m_pickerView = 0;
     }
+}
+
+QIOSMenuItemList QIOSMenu::visibleMenuItems()
+{
+    QIOSMenuItemList visibleMenuItems;
+    visibleMenuItems.reserve(m_menuItems.size());
+
+    for (int i = 0; i < m_menuItems.count(); ++i) {
+        QIOSMenuItem *item = m_menuItems.at(i);
+        if (!item->m_enabled || !item->m_visible)
+            continue;
+        visibleMenuItems.append(item);
+    }
+
+    return visibleMenuItems;
+}
+
+UIResponder *QIOSMenu::menuActionTarget()
+{
+    return m_currentMenu ? m_currentMenu->m_menuActionTarget : 0;
 }
 
 void QIOSMenu::rootViewGeometryChanged()
@@ -486,12 +512,6 @@ QPlatformMenuItem *QIOSMenu::menuItemForTag(quintptr tag) const
 
 void QIOSMenu::menuItemSelected(QIOSMenuItem *menuItem)
 {
-    menuItemSelected(m_menuItems.indexOf(menuItem));
-}
-
-void QIOSMenu::menuItemSelected(int index)
-{
-    if (index >= 0)
-        emit m_menuItems.at(index)->activated();
+    emit menuItem->activated();
     setVisible(false);
 }
