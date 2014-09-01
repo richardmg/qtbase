@@ -124,17 +124,21 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 // -------------------------------------------------------------------------
 
 @interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource> {
+    QList<QIOSMenuItem *> m_visibleMenuItems;
     NSInteger m_selectedRow;
 }
 @end
 
 @implementation QUIPickerView
 
-- (id)init
+- (id)initWithVisibleMenuItems:(QList<QIOSMenuItem *>)visibleMenuItems selectRow:(NSInteger)selectRow
 {
     if (self = [super init]) {
+        m_visibleMenuItems = visibleMenuItems;
+        m_selectedRow = selectRow;
         [self setDelegate:self];
         [self setDataSource:self];
+        [self selectRow:selectRow inComponent:0 animated:false];
     }
 
     return self;
@@ -144,7 +148,7 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 {
     Q_UNUSED(pickerView);
     Q_UNUSED(component);
-    return g_currentMenu->menuItems().at(row)->m_text.toNSString();
+    return m_visibleMenuItems.at(row)->m_text.toNSString();
 }
 
 - (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView
@@ -157,7 +161,7 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 {
     Q_UNUSED(pickerView);
     Q_UNUSED(component);
-    return g_currentMenu->menuItems().length();
+    return m_visibleMenuItems.length();
 }
 
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component
@@ -169,7 +173,10 @@ UIResponder *QIOSMenu::m_menuActionTarget = [[QIOSMenuActionTarget alloc] init];
 
 - (void)closeMenu
 {
-    g_currentMenu->menuItemSelected(m_selectedRow);
+    if (m_visibleMenuItems.isEmpty())
+        g_currentMenu->menuItemSelected(-1);
+    else
+        g_currentMenu->menuItemSelected(m_visibleMenuItems.at(m_selectedRow));
 }
 
 @end
@@ -402,7 +409,21 @@ void QIOSMenu::updateVisibilityUsingUIActionSheet()
 void QIOSMenu::updateVisibilityUsingUIPickerView()
 {
     if (m_effectiveVisible) {
-        m_pickerView = [[QUIPickerView alloc] init];
+        int selectRow = 0;
+        QList<QIOSMenuItem *> visibleMenuItems;
+        visibleMenuItems.reserve(m_menuItems.size());
+
+        for (int i = 0; i < m_menuItems.count(); ++i) {
+            QIOSMenuItem *item = m_menuItems.at(i);
+            if (!item->m_enabled || !item->m_visible)
+                continue;
+            visibleMenuItems.append(item);
+            if (item == m_targetItem)
+                selectRow = i;
+        }
+
+        m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:visibleMenuItems selectRow:selectRow];
+
         if (QWindow *window = qGuiApp->focusWindow()) {
             QUIView *view = reinterpret_cast<QUIView *>(window->winId());
             view.inputView = m_pickerView;
@@ -413,11 +434,6 @@ void QIOSMenu::updateVisibilityUsingUIPickerView()
                 target:m_pickerView action:@selector(closeMenu)] autorelease];
             [toolbar setItems:[NSArray arrayWithObject:doneButton]];
             view.inputAccessoryView = toolbar;
-
-            int selectRow;
-            for (selectRow = m_menuItems.count() - 1; selectRow > 0 && m_targetItem != m_menuItems.at(selectRow); --selectRow);
-            [m_pickerView selectRow:selectRow inComponent:0 animated:false];
-
             [view reloadInputViews];
         }
     } else {
@@ -468,8 +484,14 @@ QPlatformMenuItem *QIOSMenu::menuItemForTag(quintptr tag) const
     return 0;
 }
 
+void QIOSMenu::menuItemSelected(QIOSMenuItem *menuItem)
+{
+    menuItemSelected(m_menuItems.indexOf(menuItem));
+}
+
 void QIOSMenu::menuItemSelected(int index)
 {
-    emit m_menuItems.at(index)->activated();
+    if (index >= 0)
+        emit m_menuItems.at(index)->activated();
     setVisible(false);
 }

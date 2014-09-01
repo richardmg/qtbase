@@ -104,9 +104,8 @@ public:
     QPlatformMenuItem *menuItemAt(int position) const Q_DECL_OVERRIDE;
     QPlatformMenuItem *menuItemForTag(quintptr tag) const Q_DECL_OVERRIDE;
 
-    QList<QIOSMenuItem *> menuItems() { return m_menuItems; }
     static UIResponder *menuActionTarget() { return m_menuActionTarget; }
-
+    void menuItemSelected(QIOSMenuItem *menuItem);
     void menuItemSelected(int index);
 
 private:
