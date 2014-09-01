@@ -46,17 +46,17 @@
 #include "qiosmenu.h"
 #include "qioswindow.h"
 
-// g_currentMenu points to the popup currently
+// m_currentMenu points to the popup currently
 // executing (only one popup should be open at a time)
-static QIOSMenu *g_currentMenu = 0;
+QIOSMenu *QIOSMenu::m_currentMenu = 0;
 
 // -------------------------------------------------------------------------
 
 #define QIOS_MENUITEM_ACTION(index) \
     - (void)_qtMenuItem_ ## index \
     { \
-        if (g_currentMenu) \
-            g_currentMenu->menuItemSelected(m_visibleMenuItems.at(index)); \
+        emit m_visibleMenuItems.at(index)->activated(); \
+        QIOSMenu::currentMenu()->setVisible(false); \
     }
 
 @interface QUIMenuControllerActionTarget : UIResponder {
@@ -157,8 +157,8 @@ QIOS_MENUITEM_ACTION(19)
 - (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)index
 {
     Q_UNUSED(actionSheet);
-    if (g_currentMenu)
-        g_currentMenu->menuItemSelected(m_visibleMenuItems.at(index));
+    emit m_visibleMenuItems.at(index)->activated();
+    QIOSMenu::currentMenu()->setVisible(false);
 }
 
 @end
@@ -218,10 +218,9 @@ QIOS_MENUITEM_ACTION(19)
 
 - (void)closeMenu
 {
-    if (m_visibleMenuItems.isEmpty())
-        g_currentMenu->setVisible(false);
-    else
-        g_currentMenu->menuItemSelected(m_visibleMenuItems.at(m_selectedRow));
+    if (!m_visibleMenuItems.isEmpty())
+        emit m_visibleMenuItems.at(m_selectedRow)->activated();
+    QIOSMenu::currentMenu()->setVisible(false);
 }
 
 @end
@@ -354,16 +353,16 @@ void QIOSMenu::setVisible(bool visible)
 void QIOSMenu::updateVisibility()
 {
     bool visibleAndEnabled = m_visible && m_enabled;
-    if ((visibleAndEnabled && m_effectiveVisible) || (!visibleAndEnabled && g_currentMenu != this))
+    if ((visibleAndEnabled && m_effectiveVisible) || (!visibleAndEnabled && m_currentMenu != this))
         return;
 
     m_effectiveVisible = visibleAndEnabled;
 
     if (m_effectiveVisible) {
-        Q_ASSERT(g_currentMenu != this);
-        if (g_currentMenu)
-            g_currentMenu->setVisible(false);
-        g_currentMenu = this;
+        Q_ASSERT(m_currentMenu != this);
+        if (m_currentMenu)
+            m_currentMenu->setVisible(false);
+        m_currentMenu = this;
         m_effectiveMenuType = m_menuType;
         emit aboutToShow();
     }
@@ -376,8 +375,8 @@ void QIOSMenu::updateVisibility()
     if (!m_effectiveVisible) {
         // Emit the signal after the fact in case
         // the app opens a popup when receiving it.
-        if (g_currentMenu == this)
-            g_currentMenu = 0;
+        if (m_currentMenu == this)
+            m_currentMenu = 0;
         emit aboutToHide();
     }
 }
@@ -406,6 +405,7 @@ void QIOSMenu::updateVisibilityUsingUIMenuController()
         Q_ASSERT(m_menuActionTarget);
         [menuController setMenuVisible:NO animated:YES];
         [m_menuActionTarget release];
+        m_menuActionTarget = 0;
     }
 }
 
@@ -472,11 +472,6 @@ QIOSMenuItemList QIOSMenu::visibleMenuItems()
     return visibleMenuItems;
 }
 
-UIResponder *QIOSMenu::menuActionTarget()
-{
-    return m_currentMenu ? m_currentMenu->m_menuActionTarget : 0;
-}
-
 void QIOSMenu::rootViewGeometryChanged()
 {
     if (!m_effectiveVisible || qApp->inputMethod()->isAnimating())
@@ -489,7 +484,7 @@ void QIOSMenu::rootViewGeometryChanged()
         [menuController setMenuVisible:YES animated:YES];
     } else /* if (m_effectiveMenuType == OptionsMenu) */ {
         if (!qApp->inputMethod()->isVisible())
-            g_currentMenu->setVisible(false);
+            m_currentMenu->setVisible(false);
     }
 }
 
@@ -508,10 +503,4 @@ QPlatformMenuItem *QIOSMenu::menuItemForTag(quintptr tag) const
             return item;
     }
     return 0;
-}
-
-void QIOSMenu::menuItemSelected(QIOSMenuItem *menuItem)
-{
-    emit menuItem->activated();
-    setVisible(false);
 }

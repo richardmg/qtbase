@@ -49,7 +49,6 @@
 
 #import "quiview.h"
 
-@class QUIMenuControllerActionTarget;
 @class QUIActionSheet;
 @class QUIPickerView;
 
@@ -108,8 +107,8 @@ public:
     QPlatformMenuItem *menuItemAt(int position) const Q_DECL_OVERRIDE;
     QPlatformMenuItem *menuItemForTag(quintptr tag) const Q_DECL_OVERRIDE;
 
-    static UIResponder *menuActionTarget();
-    void menuItemSelected(QIOSMenuItem *menuItem);
+    static QIOSMenu *currentMenu() { return m_currentMenu; }
+    UIResponder *menuActionTarget() { return m_menuActionTarget; }
 
 private:
     quintptr m_tag;
@@ -121,7 +120,7 @@ private:
     MenuType m_effectiveMenuType;
     QRect m_targetRect;
     const QIOSMenuItem *m_targetItem;
-    QUIMenuControllerActionTarget *m_menuActionTarget;
+    UIResponder *m_menuActionTarget;
     QUIActionSheet *m_actionSheet;
     QUIPickerView *m_pickerView;
     QIOSMenuItemList m_menuItems;
