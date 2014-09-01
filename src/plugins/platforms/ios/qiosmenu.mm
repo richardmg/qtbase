@@ -226,7 +226,7 @@ QIOSMenu::QIOSMenu()
     , m_menuType(DefaultMenu)
     , m_effectiveMenuType(DefaultMenu)
     , m_targetRect(QRect(qGuiApp->primaryScreen()->availableGeometry().center(), QSize()))
-    , m_targetIndex(0)
+    , m_targetItem(0)
     , m_actionSheet(0)
     , m_pickerView(0)
 {
@@ -280,12 +280,7 @@ void QIOSMenu::setEnabled(bool enabled)
 void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, const QPlatformMenuItem *item)
 {
     m_targetRect = QRect(parentWindow->mapToGlobal(targetRect.topLeft()), targetRect.size());
-
-    for (m_targetIndex = m_menuItems.count() - 1; m_targetIndex >= 0; --m_targetIndex) {
-        if (item == m_menuItems.at(m_targetIndex))
-            break;
-    }
-
+    m_targetItem = static_cast<const QIOSMenuItem *>(item);
     setVisible(true);
 }
 
@@ -419,7 +414,9 @@ void QIOSMenu::updateVisibilityUsingUIPickerView()
             [toolbar setItems:[NSArray arrayWithObject:doneButton]];
             view.inputAccessoryView = toolbar;
 
-            [m_pickerView selectRow:m_targetIndex inComponent:0 animated:false];
+            int selectRow;
+            for (selectRow = m_menuItems.count() - 1; selectRow > 0 && m_targetItem != m_menuItems.at(selectRow); --selectRow);
+            [m_pickerView selectRow:selectRow inComponent:0 animated:false];
 
             [view reloadInputViews];
         }
