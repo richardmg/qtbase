@@ -98,7 +98,7 @@ class Q_GUI_EXPORT QPlatformMenu : public QObject
 {
 Q_OBJECT
 public:
-    enum MenuType { DefaultMenu = 0, EditMenu };
+    enum MenuType { DefaultMenu = 0, EditMenu, OptionMenu, ActionMenu };
 
     virtual void insertMenuItem(QPlatformMenuItem *menuItem, QPlatformMenuItem *before) = 0;
     virtual void removeMenuItem(QPlatformMenuItem *menuItem) = 0;
