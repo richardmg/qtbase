@@ -133,6 +133,46 @@ QIOSMenu *QIOSMenu::m_currentMenu = 0;
 
 // -------------------------------------------------------------------------
 
+@interface QUIActionSheet : UIActionSheet <UIActionSheetDelegate>{
+    QIOSMenuItemList m_visibleMenuItems;
+}
+@end
+
+@implementation QUIActionSheet
+
+- (id)initWithVisibleMenuItems:(const QIOSMenuItemList &)visibleMenuItems title:(const QString &)title
+{
+    if (self = [super
+            initWithTitle:title.isEmpty() ? nil : title.toNSString()
+            delegate:self
+            cancelButtonTitle:nil
+            destructiveButtonTitle:nil
+            otherButtonTitles:nil]) {
+        m_visibleMenuItems = visibleMenuItems;
+        for (int i = 0; i < visibleMenuItems.count(); ++i)
+            [self addButtonWithTitle:m_visibleMenuItems.at(i)->m_text.toNSString()];
+    }
+
+    return self;
+}
+
+- (void)openSheetWithTargetRect:(const QRect &)rect
+{
+    UIView *view = [UIApplication sharedApplication].keyWindow.rootViewController.view;
+    [self showFromRect:toCGRect(rect) inView:view animated:YES];
+}
+
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)index
+{
+    Q_UNUSED(actionSheet);
+    emit m_visibleMenuItems.at(index)->activated();
+    QIOSMenu::currentMenu()->setVisible(false);
+}
+
+@end
+
+// -------------------------------------------------------------------------
+
 @interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource> {
     QIOSMenuItemList m_visibleMenuItems;
     QUIView *m_viewWithPickerAsInputView;
@@ -276,6 +316,7 @@ QIOSMenu::QIOSMenu()
     , m_targetRect(QRect(qGuiApp->primaryScreen()->availableGeometry().center(), QSize()))
     , m_targetItem(0)
     , m_menuController(0)
+    , m_actionSheet(0)
     , m_pickerView(0)
 {
     connect(qGuiApp->inputMethod(), &QInputMethod::animatingChanged, this, &QIOSMenu::rootViewGeometryChanged);
@@ -367,6 +408,9 @@ void QIOSMenu::updateVisibility()
     case EditMenu:
         updateVisibilityUsingUIMenuController();
         break;
+    case ActionMenu:
+        updateVisibilityUsingUIActionSheet();
+        break;
     default:
         updateVisibilityUsingUIPickerView();
         break;
@@ -397,6 +441,19 @@ void QIOSMenu::updateVisibilityUsingUIMenuController()
         [m_menuController showMenu:false targetRect:m_targetRect];
         [m_menuController release];
         m_menuController = 0;
+    }
+}
+
+void QIOSMenu::updateVisibilityUsingUIActionSheet()
+{
+    if (m_effectiveVisible) {
+        Q_ASSERT(!m_actionSheet);
+        m_actionSheet = [[QUIActionSheet alloc] initWithVisibleMenuItems:visibleMenuItems() title:m_text];
+        [m_actionSheet openSheetWithTargetRect:m_targetRect];
+    } else {
+        Q_ASSERT(m_actionSheet);
+        [m_actionSheet release];
+        m_actionSheet = 0;
     }
 }
 

@@ -50,6 +50,7 @@
 #import "quiview.h"
 
 @class QUIMenuController;
+@class QUIActionSheet;
 @class QUIPickerView;
 
 class QIOSMenuItem : public QPlatformMenuItem
@@ -121,6 +122,7 @@ private:
     QRect m_targetRect;
     const QIOSMenuItem *m_targetItem;
     QUIMenuController *m_menuController;
+    QUIActionSheet *m_actionSheet;
     QUIPickerView *m_pickerView;
     QIOSMenuItemList m_menuItems;
 
@@ -128,6 +130,7 @@ private:
 
     void updateVisibility();
     void updateVisibilityUsingUIMenuController();
+    void updateVisibilityUsingUIActionSheet();
     void updateVisibilityUsingUIPickerView();
     QIOSMenuItemList visibleMenuItems() const;
     void rootViewGeometryChanged();
