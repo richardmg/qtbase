@@ -861,15 +861,14 @@ void QAccessible::setRootObject(QObject *object)
 */
 void QAccessible::updateAccessibility(QAccessibleEvent *event)
 {
-    if (!isActive())
+    if (!isActive() || !event->accessibleInterface())
         return;
 
 #ifndef QT_NO_ACCESSIBILITY
     if (event->type() == QAccessible::TableModelChanged) {
-        if (QAccessibleInterface *iface = event->accessibleInterface()) {
-            if (iface->tableInterface())
-                iface->tableInterface()->modelChange(static_cast<QAccessibleTableModelChangeEvent*>(event));
-        }
+        QAccessibleInterface *iface = event->accessibleInterface();
+        if (iface->tableInterface())
+            iface->tableInterface()->modelChange(static_cast<QAccessibleTableModelChangeEvent*>(event));
     }
 
     if (updateHandler) {
