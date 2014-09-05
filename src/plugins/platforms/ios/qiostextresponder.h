@@ -43,6 +43,9 @@
 
 #include <QtCore/qstring.h>
 
+#define QIOS_INPUT_VIEW "_qios_inputView"
+#define QIOS_ACCESSORY_VIEW "_qios_inputAccessoryView"
+
 class QIOSInputContext;
 
 @interface QIOSTextInputResponder : UIResponder <UITextInputTraits, UIKeyInput, UITextInput>

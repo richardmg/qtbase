@@ -113,6 +113,10 @@
     else
         self.keyboardType = UIKeyboardTypeDefault;
 
+    self.inputView = static_cast<UIView *>(m_inputContext->imeState().platformData.value(QIOS_INPUT_VIEW).value<void *>());
+    self.inputAccessoryView = static_cast<UIView *>(m_inputContext->imeState().platformData.value(QIOS_ACCESSORY_VIEW).value<void *>());
+    qDebug() << self.inputView;
+
     return self;
 }
 

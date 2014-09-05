@@ -258,15 +258,26 @@
 
 Qt::InputMethodQueries ImeState::update(Qt::InputMethodQueries properties)
 {
-    if (!properties)
+    if (!properties || !qApp)
         return 0;
 
     QInputMethodQueryEvent newState(properties);
-
-    if (qApp && qApp->focusObject())
-        QCoreApplication::sendEvent(qApp->focusObject(), &newState);
-
     Qt::InputMethodQueries updatedProperties;
+
+    if (QObject *focusObject = qApp->focusObject()) {
+        QCoreApplication::sendEvent(focusObject, &newState);
+        QVariant inputView = focusObject->property(QIOS_INPUT_VIEW);
+        QVariant accessoryView = focusObject->property(QIOS_ACCESSORY_VIEW);
+
+        // Bytt ut platformData prop med QVariantMap i qobject for enklere test nedenfor:
+
+        if (inputView != platformData.value(QIOS_INPUT_VIEW) || accessoryView != platformData.value(QIOS_ACCESSORY_VIEW)) {
+            platformData.insert(QIOS_INPUT_VIEW, inputView);
+            platformData.insert(QIOS_ACCESSORY_VIEW, accessoryView);
+            updatedProperties |= Qt::ImPlatformData;
+        }
+    }
+
     for (uint i = 0; i < (sizeof(Qt::ImQueryAll) * CHAR_BIT); ++i) {
         if (Qt::InputMethodQuery property = Qt::InputMethodQuery(int(properties & (1 << i)))) {
             if (newState.value(property) != currentState.value(property)) {
@@ -431,21 +442,7 @@ void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
     updatedProperties &= (Qt::ImEnabled | Qt::ImHints | Qt::ImQueryInput | Qt::ImPlatformData);
     Qt::InputMethodQueries changedProperties = m_imeState.update(updatedProperties);
 
-    if (updatedProperties & Qt::ImPlatformData) {
-        UIView *inputView = 0;
-        UIView *accessoryView = 0;
-        if (QObject *focusObject = qApp->focusObject()) {
-            inputView = static_cast<UIView *>(focusObject->property(QIOS_INPUT_VIEW).value<void *>());
-            accessoryView = static_cast<UIView *>(focusObject->property(QIOS_ACCESSORY_VIEW).value<void *>());
-        }
-        if (m_textResponder.inputView != inputView) {
-            m_textResponder.inputView = inputView;
-            m_textResponder.inputAccessoryView = accessoryView;
-            [m_textResponder reloadInputViews];
-        }
-    }
-
-    if (changedProperties & (Qt::ImEnabled | Qt::ImHints)) {
+    if (changedProperties & (Qt::ImEnabled | Qt::ImHints | Qt::ImPlatformData)) {
         // Changes to enablement or hints require virtual keyboard reconfigure
         [m_textResponder release];
         m_textResponder = [[QIOSTextInputResponder alloc] initWithInputContext:this];

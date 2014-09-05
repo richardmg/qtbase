@@ -48,9 +48,6 @@
 #include <QtGui/qtransform.h>
 #include <qpa/qplatforminputcontext.h>
 
-#define QIOS_INPUT_VIEW "_qios_inputView"
-#define QIOS_ACCESSORY_VIEW "_qios_inputAccessoryView"
-
 QT_BEGIN_NAMESPACE
 
 @class QIOSKeyboardListener;
@@ -61,6 +58,7 @@ struct ImeState
     ImeState() : currentState(0) {}
     Qt::InputMethodQueries update(Qt::InputMethodQueries properties);
     QInputMethodQueryEvent currentState;
+    QVariantMap platformData;
 };
 
 class QIOSInputContext : public QPlatformInputContext
