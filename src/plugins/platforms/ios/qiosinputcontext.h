@@ -48,6 +48,9 @@
 #include <QtGui/qtransform.h>
 #include <qpa/qplatforminputcontext.h>
 
+#define QIOS_INPUT_VIEW "_qios_inputView"
+#define QIOS_ACCESSORY_VIEW "_qios_inputAccessoryView"
+
 QT_BEGIN_NAMESPACE
 
 @class QIOSKeyboardListener;
@@ -87,6 +90,7 @@ public:
 
     const ImeState &imeState() { return m_imeState; };
     void setAnimating(bool animating);
+    QIOSTextInputResponder *responder() { return m_textResponder; }
 
 private:
     QIOSKeyboardListener *m_keyboardListener;

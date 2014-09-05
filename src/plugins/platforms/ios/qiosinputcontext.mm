@@ -428,8 +428,22 @@ void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
 void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
 {
     // Mask for properties that we are interested in and see if any of them changed
-    updatedProperties &= (Qt::ImEnabled | Qt::ImHints | Qt::ImQueryInput);
+    updatedProperties &= (Qt::ImEnabled | Qt::ImHints | Qt::ImQueryInput | Qt::ImPlatformData);
     Qt::InputMethodQueries changedProperties = m_imeState.update(updatedProperties);
+
+    if (updatedProperties & Qt::ImPlatformData) {
+        UIView *inputView = 0;
+        UIView *accessoryView = 0;
+        if (QObject *focusObject = qApp->focusObject()) {
+            inputView = static_cast<UIView *>(focusObject->property(QIOS_INPUT_VIEW).value<void *>());
+            accessoryView = static_cast<UIView *>(focusObject->property(QIOS_ACCESSORY_VIEW).value<void *>());
+        }
+        if (m_textResponder.inputView != inputView) {
+            m_textResponder.inputView = inputView;
+            m_textResponder.inputAccessoryView = accessoryView;
+            [m_textResponder reloadInputViews];
+        }
+    }
 
     if (changedProperties & (Qt::ImEnabled | Qt::ImHints)) {
         // Changes to enablement or hints require virtual keyboard reconfigure

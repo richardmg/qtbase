@@ -45,6 +45,9 @@
 #include "qiosglobal.h"
 #include "qiosmenu.h"
 #include "qioswindow.h"
+#include "qiosinputcontext.h"
+#include "qiosintegration.h"
+#include "qiostextresponder.h"
 
 // m_currentMenu points to the popup currently
 // executing (only one popup should be open at a time)
@@ -134,8 +137,9 @@ QIOSMenu *QIOSMenu::m_currentMenu = 0;
 // -------------------------------------------------------------------------
 
 @interface QUIPickerView : UIPickerView <UIPickerViewDelegate, UIPickerViewDataSource> {
+    UIToolbar *m_toolbar;
     QIOSMenuItemList m_visibleMenuItems;
-    QUIView *m_viewWithPickerAsInputView;
+    QPointer<QObject> m_focusObjectWithPickerView;
     NSInteger m_selectedRow;
 }
 @end
@@ -146,7 +150,6 @@ QIOSMenu *QIOSMenu::m_currentMenu = 0;
 {
     if (self = [super init]) {
         m_visibleMenuItems = visibleMenuItems;
-        m_viewWithPickerAsInputView = 0;
         m_selectedRow = visibleMenuItems.indexOf(const_cast<QIOSMenuItem *>(selectItem));
         if (m_selectedRow == -1)
             m_selectedRow = 0;
@@ -162,27 +165,39 @@ QIOSMenu *QIOSMenu::m_currentMenu = 0;
 -(void)setAsInputView:(BOOL)set
 {
     if (set) {
-        Q_ASSERT(!m_viewWithPickerAsInputView);
-        if (QWindow *window = qGuiApp->focusWindow()) {
-            m_viewWithPickerAsInputView = [reinterpret_cast<QUIView *>(window->winId()) retain];
-            m_viewWithPickerAsInputView.inputView = self;
+        Q_ASSERT(!m_focusObjectWithPickerView);
+        m_focusObjectWithPickerView = qApp->focusWindow()->focusObject();
+        if (!m_focusObjectWithPickerView) {
+            qWarning() << "QIOSMenu: cannot open options menu without a focus object!";
+            return;
+        }
 
-            UIToolbar *toolbar = [[[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 320, 44)] autorelease];
-            UIBarButtonItem *doneButton = [[[UIBarButtonItem alloc]
-                    initWithBarButtonSystemItem:UIBarButtonSystemItemDone
-                    target:self action:@selector(closeMenu)] autorelease];
-            [toolbar setItems:[NSArray arrayWithObject:doneButton]];
-            m_viewWithPickerAsInputView.inputAccessoryView = toolbar;
-            [m_viewWithPickerAsInputView reloadInputViews];
-        }
+        m_toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 320, 44)];
+        UIBarButtonItem *doneButton = [[[UIBarButtonItem alloc]
+                initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                target:self action:@selector(closeMenu)] autorelease];
+        [m_toolbar setItems:[NSArray arrayWithObject:doneButton]];
+
+        // We attach the input panel to the focus object, along with the accessory view, and
+        // inform QIOSInputContext that Im data has changed. The input context will then find
+        // the attached input panel, set it on some UIResponder, and open the "keyboard".
+        Q_ASSERT(!m_focusObjectWithPickerView->property(QIOS_INPUT_VIEW).isValid());
+        m_focusObjectWithPickerView->setProperty(QIOS_INPUT_VIEW, QVariant::fromValue(static_cast<void *>(self)));
+        m_focusObjectWithPickerView->setProperty(QIOS_ACCESSORY_VIEW, QVariant::fromValue(static_cast<void *>(m_toolbar)));
+        qApp->inputMethod()->update(Qt::ImPlatformData);
     } else {
-        if (m_viewWithPickerAsInputView.inputView == self) {
-            m_viewWithPickerAsInputView.inputView = 0;
-            m_viewWithPickerAsInputView.inputAccessoryView = 0;
-            [m_viewWithPickerAsInputView reloadInputViews];
+        if (m_focusObjectWithPickerView
+                && m_focusObjectWithPickerView->property(QIOS_INPUT_VIEW).value<void *>() == static_cast<void *>(self)) {
+            m_focusObjectWithPickerView->setProperty(QIOS_INPUT_VIEW, QVariant());
+            m_focusObjectWithPickerView->setProperty(QIOS_ACCESSORY_VIEW, QVariant());
         }
-        [m_viewWithPickerAsInputView release];
-        m_viewWithPickerAsInputView = 0;
+
+        [m_toolbar release];
+        m_toolbar = 0;
+
+        if (m_focusObjectWithPickerView == qApp->focusWindow()->focusObject())
+            qApp->inputMethod()->update(Qt::ImPlatformData);
+        m_focusObjectWithPickerView = 0;
     }
 }
 
