@@ -173,7 +173,9 @@ static QUIView *focusView()
 
     m_context->scrollToCursor();
 
+    m_keyboardVisible = YES;
     m_animating = YES;
+    m_context->emitInputPanelVisibleChanged();
     m_context->emitAnimatingChanged();
 }
 
@@ -189,7 +191,9 @@ static QUIView *focusView()
     }
     m_context->scroll(0);
 
+    m_keyboardVisible = NO;
     m_animating = YES;
+    m_context->emitInputPanelVisibleChanged();
     m_context->emitAnimatingChanged();
 }
 
@@ -209,12 +213,6 @@ static QUIView *focusView()
     if (convertedRect != m_keyboardRect) {
         m_keyboardRect = convertedRect;
         m_context->emitKeyboardRectChanged();
-    }
-
-    BOOL visible = CGRectIntersectsRect(m_keyboardEndRect, [UIScreen mainScreen].bounds);
-    if (m_keyboardVisible != visible) {
-        m_keyboardVisible = visible;
-        m_context->emitInputPanelVisibleChanged();
     }
 
     if (!m_animating) {
