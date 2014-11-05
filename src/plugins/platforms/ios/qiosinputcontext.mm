@@ -68,6 +68,7 @@ static QUIView *focusView()
     QIOSInputContext *m_context;
     BOOL m_keyboardVisible;
     BOOL m_keyboardVisibleAndDocked;
+    BOOL m_animating;
     QRectF m_keyboardRect;
     CGRect m_keyboardEndRect;
     NSTimeInterval m_duration;
@@ -85,6 +86,7 @@ static QUIView *focusView()
         m_context = context;
         m_keyboardVisible = NO;
         m_keyboardVisibleAndDocked = NO;
+        m_animating = NO;
         m_duration = 0;
         m_curve = UIViewAnimationCurveEaseOut;
         m_viewController = 0;
@@ -170,6 +172,9 @@ static QUIView *focusView()
     self.enabled = YES;
 
     m_context->scrollToCursor();
+
+    m_animating = YES;
+    m_context->emitAnimatingChanged();
 }
 
 - (void) keyboardWillHide:(NSNotification *)notification
@@ -183,6 +188,9 @@ static QUIView *focusView()
         self.enabled = NO;
     }
     m_context->scroll(0);
+
+    m_animating = YES;
+    m_context->emitAnimatingChanged();
 }
 
 - (void) handleKeyboardRectChanged
@@ -207,6 +215,11 @@ static QUIView *focusView()
     if (m_keyboardVisible != visible) {
         m_keyboardVisible = visible;
         m_context->emitInputPanelVisibleChanged();
+    }
+
+    if (!m_animating) {
+        m_animating = NO;
+        m_context->emitAnimatingChanged();
     }
 }
 
@@ -349,6 +362,11 @@ QIOSInputContext::~QIOSInputContext()
 QRectF QIOSInputContext::keyboardRect() const
 {
     return m_keyboardListener->m_keyboardRect;
+}
+
+bool QIOSInputContext::isAnimating() const
+{
+    return m_keyboardListener->m_animating;
 }
 
 void QIOSInputContext::showInputPanel()

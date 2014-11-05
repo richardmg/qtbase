@@ -66,6 +66,7 @@ public:
     ~QIOSInputContext();
 
     QRectF keyboardRect() const;
+    bool isAnimating() const Q_DECL_OVERRIDE;
 
     void showInputPanel();
     void hideInputPanel();
