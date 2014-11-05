@@ -453,8 +453,10 @@ void QIOSMenu::toggleShowUsingUIPickerView(bool show)
         focusObjectWithPickerView = qApp->focusWindow()->focusObject();
         focusObjectWithPickerView->installEventFilter(this);
         qApp->inputMethod()->update(Qt::ImEnabled | Qt::ImPlatformData);
+        connect(QIOSInputContext::instance(), &QIOSInputContext::gestureTriggered, this, &QIOSMenu::dismiss);
     } else {
         Q_ASSERT(focusObjectWithPickerView);
+        disconnect(QIOSInputContext::instance(), &QIOSInputContext::gestureTriggered, this, &QIOSMenu::dismiss);
         focusObjectWithPickerView->removeEventFilter(this);
         qApp->inputMethod()->update(Qt::ImEnabled | Qt::ImPlatformData);
         focusObjectWithPickerView = 0;
