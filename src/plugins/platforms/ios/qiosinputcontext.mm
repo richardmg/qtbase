@@ -272,7 +272,11 @@ static QUIView *focusView()
         qImDebug() << "hide keyboard gesture was triggered";
         UIResponder *firstResponder = [UIResponder currentFirstResponder];
         Q_ASSERT([firstResponder isKindOfClass:[QIOSTextInputResponder class]]);
-        [firstResponder resignFirstResponder];
+
+        emit m_context->gestureTriggered();
+
+        if (firstResponder == [UIResponder currentFirstResponder])
+            [firstResponder resignFirstResponder];
     }
 }
 
@@ -594,3 +598,5 @@ void QIOSInputContext::commit()
     [m_textResponder unmarkText];
     [m_textResponder notifyInputDelegate:Qt::ImSurroundingText];
 }
+
+#include "moc_qiosinputcontext.cpp"

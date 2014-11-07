@@ -59,6 +59,8 @@ struct ImeState
 
 class QIOSInputContext : public QPlatformInputContext
 {
+    Q_OBJECT
+
 public:
     QIOSInputContext();
     ~QIOSInputContext();
@@ -86,6 +88,9 @@ public:
     bool inputMethodAccepted() const;
 
     static QIOSInputContext *instance();
+
+Q_SIGNALS:
+    void gestureTriggered();
 
 private:
     QIOSKeyboardListener *m_keyboardListener;
