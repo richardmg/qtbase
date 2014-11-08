@@ -391,7 +391,6 @@ void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, c
 
     m_currentMenu = this;
     m_effectiveMenuType = m_menuType;
-    connect(qGuiApp, &QGuiApplication::focusObjectChanged, this, &QIOSMenu::dismiss);
 
     switch (m_effectiveMenuType) {
     case EditMenu:
@@ -401,6 +400,8 @@ void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, c
         toggleShowUsingUIPickerView(true);
         break;
     }
+
+    connect(qGuiApp, &QGuiApplication::focusObjectChanged, this, &QIOSMenu::dismiss);
 }
 
 void QIOSMenu::dismiss()
@@ -450,6 +451,7 @@ void QIOSMenu::toggleShowUsingUIPickerView(bool show)
         m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:visibleMenuItems() selectItem:m_targetItem];
 
         Q_ASSERT(!focusObjectWithPickerView);
+        QIOSInputContext::instance()->clearCurrentFocusObject();
         focusObjectWithPickerView = qApp->focusWindow()->focusObject();
         focusObjectWithPickerView->installEventFilter(this);
         qApp->inputMethod()->update(Qt::ImEnabled | Qt::ImPlatformData);
