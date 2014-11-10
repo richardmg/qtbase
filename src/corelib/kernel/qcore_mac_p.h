@@ -66,6 +66,7 @@
 #endif
 
 #include "qstring.h"
+#include "qdebug.h"
 
 #if defined( __OBJC__) && defined(QT_NAMESPACE)
 #define QT_NAMESPACE_ALIAS_OBJC_CLASS(__KLASS__) @compatibility_alias __KLASS__ QT_MANGLE_NAMESPACE(__KLASS__)
@@ -134,6 +135,10 @@ public:
 private:
     QString string;
 };
+
+#ifdef __OBJC__
+QDebug operator<<(QDebug dbg, const NSObject *nsObject);
+#endif
 
 #ifdef Q_OS_IOS
 QSysInfo::MacVersion qt_ios_version();

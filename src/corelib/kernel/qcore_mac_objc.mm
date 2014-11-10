@@ -58,6 +58,12 @@ QString QCFString::toQString(const NSString *nsstr)
     return toQString(reinterpret_cast<CFStringRef>(nsstr));
 }
 
+QDebug operator<<(QDebug dbg, const NSObject *nsObject)
+{
+    dbg << QString::fromNSString(nsObject.description);
+    return dbg;
+}
+
 #ifdef Q_OS_IOS
 QSysInfo::MacVersion qt_ios_version()
 {
