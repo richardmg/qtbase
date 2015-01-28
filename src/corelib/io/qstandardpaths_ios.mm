@@ -130,8 +130,16 @@ QString QStandardPaths::writableLocation(StandardLocation type)
 QStringList QStandardPaths::standardLocations(StandardLocation type)
 {
     QStringList dirs;
-    const QString localDir = writableLocation(type);
-    dirs.prepend(localDir);
+
+    switch (type) {
+    case PicturesLocation:
+        dirs << writableLocation(PicturesLocation) << QLatin1String("assets-library://");
+        break;
+    default:
+        dirs << writableLocation(type);
+        break;
+    }
+
     return dirs;
 }
 
