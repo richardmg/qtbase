@@ -42,6 +42,7 @@
 #ifndef QIOSFILEENGINEFACTORY_H
 #define QIOSFILEENGINEFACTORY_H
 
+#include <QtCore/qstandardpaths.h>
 #include <QtCore/private/qabstractfileengine_p.h>
 #include "qiosfileengineassetslibrary.h"
 
@@ -50,8 +51,10 @@ class QIOSFileEngineFactory : public QAbstractFileEngineHandler
 public:
     QAbstractFileEngine* create(const QString &fileName) const
     {
-        static QLatin1String scheme("assets-library:");
-        if (fileName.toLower().startsWith(scheme))
+        static QString assetsScheme =
+                QUrl(QStandardPaths::standardLocations(QStandardPaths::PicturesLocation).last()).scheme();
+
+        if (fileName.toLower().startsWith(assetsScheme))
             return new QIOSFileEngineAssetsLibrary(fileName);
 
         return 0;
