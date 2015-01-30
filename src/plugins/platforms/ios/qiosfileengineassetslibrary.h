@@ -63,8 +63,7 @@ public:
     QString fileName(FileName file) const Q_DECL_OVERRIDE;
     void setFileName(const QString &file) Q_DECL_OVERRIDE;
     QStringList entryList(QDir::Filters filters, const QStringList &filterNames) const Q_DECL_OVERRIDE;
-
-    void setAssetError(QFile::FileError error, const QString &errorString) { setError(error, errorString); }
+    void setError(QFile::FileError error, const QString &str) { QAbstractFileEngine::setError(error, str); }
 
 private:
     QString m_fileName;

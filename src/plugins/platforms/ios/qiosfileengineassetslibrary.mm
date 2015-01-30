@@ -58,7 +58,7 @@ public:
         switch ([ALAssetsLibrary authorizationStatus]) {
         case ALAuthorizationStatusRestricted:
         case ALAuthorizationStatusDenied:
-            engine->setAssetError(QFile::PermissionsError, QLatin1String("Unauthorized access"));
+            engine->setError(QFile::PermissionsError, QLatin1String("Unauthorized access"));
             return;
         case ALAuthorizationStatusNotDetermined:
             if (!static_cast<QCoreApplicationPrivate *>(QObjectPrivate::get(qApp))->in_exec) {
@@ -87,12 +87,11 @@ public:
             }
         }
 
-        // We can only load images from the asset library async. And this might take time, since
-        // it involves showing a dialog asking the user to grant access to the library. But the
-        // QFile API is synchronuous, so we need to wait until we have access to the data.
-        // [ALAssetLibrary assetForUrl:] will shedule a block on the current thread. But instead of
-        // spinning the event loop to force the block to execute, we wrap the call inside a synchronuous
-        // dispatch queue so that it executes on another thread.
+        // We can only load images from the asset library async. And this might take time, since it
+        // involves showing the authorization dialog. But the QFile API is synchronuous, so we need to
+        // wait until we have access to the data. [ALAssetLibrary assetForUrl:] will shedule a block on
+        // the current thread. But instead of spinning the event loop to force the block to execute, we
+        // wrap the call inside a synchronuous dispatch queue so that it executes on another thread.
         dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -102,7 +101,7 @@ public:
                 m_asset = [asset retain];
                 dispatch_semaphore_signal(semaphore);
             } failureBlock:^(NSError *error) {
-                engine->setAssetError(QFile::OpenError, QString::fromNSString(error.localizedDescription));
+                engine->setError(QFile::OpenError, QString::fromNSString(error.localizedDescription));
                 dispatch_semaphore_signal(semaphore);
             }];
         });
