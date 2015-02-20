@@ -125,7 +125,7 @@ QStringList QStandardPaths::standardLocations(StandardLocation type)
 
     switch (type) {
     case PicturesLocation:
-        dirs << writableLocation(PicturesLocation) << QLatin1String("assets-library://");
+        dirs << writableLocation(PicturesLocation) << QLatin1String("assets-library:");
         break;
     default:
         dirs << writableLocation(type);
