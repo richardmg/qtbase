@@ -604,7 +604,18 @@
 - (UITextPosition *)positionFromPosition:(UITextPosition *)position inDirection:(UITextLayoutDirection)direction offset:(NSInteger)offset
 {
     int p = static_cast<QUITextPosition *>(position).index;
-    return [QUITextPosition positionWithIndex:(direction == UITextLayoutDirectionRight ? p + offset : p - offset)];
+
+    switch (direction) {
+    case UITextLayoutDirectionLeft:
+        return [QUITextPosition positionWithIndex:p - offset];
+    case UITextLayoutDirectionRight:
+        return [QUITextPosition positionWithIndex:p + offset];
+        break;
+    case UITextLayoutDirectionUp:
+        return position;
+    case UITextLayoutDirectionDown:
+        return position;
+    }
 }
 
 - (UITextPosition *)positionWithinRange:(UITextRange *)range farthestInDirection:(UITextLayoutDirection)direction
