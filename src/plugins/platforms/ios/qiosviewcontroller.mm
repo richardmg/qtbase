@@ -185,7 +185,8 @@
 
 - (void)setFrame:(CGRect)newFrame
 {
-    [super setFrame:CGRectMake(0, 0, CGRectGetWidth(newFrame), CGRectGetHeight(self.window.bounds))];
+    Q_UNUSED(newFrame);
+    [super setFrame:[self convertRect:self.window.frame fromView:self.window]];
 }
 
 - (void)setBounds:(CGRect)newBounds
