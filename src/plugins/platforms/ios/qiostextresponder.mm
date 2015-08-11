@@ -48,14 +48,13 @@
 
 @interface QUITextPosition : UITextPosition
 
-@property (nonatomic) NSUInteger index;
-+ (QUITextPosition *)positionWithIndex:(NSUInteger)index;
+@property (nonatomic) NSInteger index;
 
 @end
 
 @implementation QUITextPosition
 
-+ (QUITextPosition *)positionWithIndex:(NSUInteger)index
++ (QUITextPosition *)positionWithIndex:(NSInteger)index
 {
     QUITextPosition *pos = [[QUITextPosition alloc] init];
     pos.index = index;
@@ -431,10 +430,19 @@
     }
 
     QUITextRange *r = static_cast<QUITextRange *>(range);
-    QList<QInputMethodEvent::Attribute> attrs;
-    attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, r.range.location, r.range.length, 0);
-    QInputMethodEvent e(m_markedText, attrs);
-    [self sendEventToFocusObject:e];
+    QUITextPosition *start = static_cast<QUITextPosition *>([range start]);
+
+    if (start.index == -1)
+        [self sendKeyPressRelease:Qt::Key_Up modifiers:Qt::NoModifier];
+    else if (start.index == -2)
+        [self sendKeyPressRelease:Qt::Key_Down modifiers:Qt::NoModifier];
+    else {
+        qDebug() << Q_FUNC_INFO << r.range.location << r.range.length;
+        QList<QInputMethodEvent::Attribute> attrs;
+        attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, r.range.location, r.range.length, 0);
+        QInputMethodEvent e(m_markedText, attrs);
+        [self sendEventToFocusObject:e];
+    }
 }
 
 - (UITextRange *)selectedTextRange
@@ -519,6 +527,7 @@
 {
     int p = static_cast<QUITextPosition *>(position).index;
 
+    qDebug() << Q_FUNC_INFO << offset;
     switch (direction) {
     case UITextLayoutDirectionLeft:
         return [QUITextPosition positionWithIndex:p - offset];
@@ -526,15 +535,16 @@
         return [QUITextPosition positionWithIndex:p + offset];
         break;
     case UITextLayoutDirectionUp:
-        return position;
+        return [QUITextPosition positionWithIndex:-1];
     case UITextLayoutDirectionDown:
-        return position;
+        return [QUITextPosition positionWithIndex:-2];
     }
 }
 
 - (UITextPosition *)positionWithinRange:(UITextRange *)range farthestInDirection:(UITextLayoutDirection)direction
 {
     NSRange r = static_cast<QUITextRange *>(range).range;
+    qDebug() << Q_FUNC_INFO << int(direction) << r.location << r.length;
     if (direction == UITextLayoutDirectionRight)
         return [QUITextPosition positionWithIndex:r.location + r.length];
     return [QUITextPosition positionWithIndex:r.location];
@@ -544,6 +554,7 @@
 {
     int f = static_cast<QUITextPosition *>(fromPosition).index;
     int t = static_cast<QUITextPosition *>(toPosition).index;
+    qDebug() << Q_FUNC_INFO << f << t;
     return t - f;
 }
 
