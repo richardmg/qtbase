@@ -328,6 +328,8 @@
     QWindowSystemInterface::handleKeyEvent(qApp->focusWindow(), QEvent::KeyRelease, key, modifiers, QString(), false, 1);
 }
 
+#ifndef QT_NO_SHORTCUT
+
 - (void)cut:(id)sender
 {
     Q_UNUSED(sender);
@@ -375,6 +377,74 @@
     Q_UNUSED(sender);
     [self sendKeyPressRelease:Qt::Key_U modifiers:Qt::ControlModifier];
 }
+
+// -------------------------------------------------------------------------
+
+- (void)keyCommandTriggered:(UIKeyCommand *)keyCommand
+{
+    Qt::Key key = Qt::Key(0);
+    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(0);
+
+    if (keyCommand.input == UIKeyInputLeftArrow)
+        key = Qt::Key_Left;
+    else if (keyCommand.input == UIKeyInputRightArrow)
+        key = Qt::Key_Right;
+    else if (keyCommand.input == UIKeyInputUpArrow)
+        key = Qt::Key_Up;
+    else if (keyCommand.input == UIKeyInputDownArrow)
+        key = Qt::Key_Down;
+    else
+        Q_UNREACHABLE();
+
+    if (keyCommand.modifierFlags & UIKeyModifierAlternate)
+        modifiers |= Qt::AltModifier;
+    if (keyCommand.modifierFlags & UIKeyModifierShift)
+        modifiers |= Qt::ShiftModifier;
+    if (keyCommand.modifierFlags & UIKeyModifierCommand)
+        modifiers |= Qt::ControlModifier;
+
+    [self sendKeyPressRelease:key modifiers:modifiers];
+}
+
+- (void)addKeyCommandsToArray:(NSMutableArray *)array key:(NSString *)key
+{
+    SEL s = @selector(keyCommandTriggered:);
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:0 action:s]];
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:UIKeyModifierShift action:s]];
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:UIKeyModifierAlternate action:s]];
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:UIKeyModifierAlternate|UIKeyModifierShift action:s]];
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:UIKeyModifierCommand action:s]];
+    [array addObject:[UIKeyCommand keyCommandWithInput:key modifierFlags:UIKeyModifierCommand|UIKeyModifierShift action:s]];
+}
+
+- (void)populateArrowKeys:(NSMutableArray *)array
+{
+    // We let Qt move the cursor around when the arrow keys are being used. This
+    // is normally implemented through UITextInput, but since IM in Qt have poor
+    // support for moving the cursor vertically, and even less support for selecting
+    // text across multiple paragraphs, we do this through key events.
+    [self addKeyCommandsToArray:array key:UIKeyInputUpArrow];
+    [self addKeyCommandsToArray:array key:UIKeyInputDownArrow];
+    [self addKeyCommandsToArray:array key:UIKeyInputLeftArrow];
+    [self addKeyCommandsToArray:array key:UIKeyInputRightArrow];
+}
+
+- (NSArray *)keyCommands
+{
+    // Since keyCommands is called for every key
+    // press/release, we cache the result
+    static dispatch_once_t once;
+    static NSMutableArray *array;
+
+    dispatch_once(&once, ^{
+       array = [NSMutableArray new];
+       [self populateArrowKeys:array];
+    });
+
+    return array;
+}
+
+#endif // QT_NO_SHORTCUT
 
 // -------------------------------------------------------------------------
 
