@@ -209,6 +209,9 @@
     if (UIView *accessoryView = static_cast<UIView *>(platformData.value(kImePlatformDataInputAccessoryView).value<void *>()))
         self.inputAccessoryView = [[[WrapperView alloc] initWithView:accessoryView] autorelease];
 
+    self.undoManager.groupsByEvent = NO;
+    [self rebuildUndoStack];
+
     return self;
 }
 
@@ -376,6 +379,42 @@
 {
     Q_UNUSED(sender);
     [self sendKeyPressRelease:Qt::Key_U modifiers:Qt::ControlModifier];
+}
+
+// -------------------------------------------------------------------------
+
+- (void)undo
+{
+    [self sendKeyPressRelease:Qt::Key_Z modifiers:Qt::ControlModifier];
+    [self performSelector:@selector(rebuildUndoStack) withObject:nil afterDelay:0];
+}
+
+- (void)redo
+{
+    [self sendKeyPressRelease:Qt::Key_Z modifiers:Qt::ControlModifier|Qt::ShiftModifier];
+    [self performSelector:@selector(rebuildUndoStack) withObject:nil afterDelay:0];
+}
+
+- (void)registerRedo
+{
+    NSUndoManager *undoMgr = self.undoManager;
+    [undoMgr beginUndoGrouping];
+    [undoMgr registerUndoWithTarget:self selector:@selector(redo) object:nil];
+    [undoMgr endUndoGrouping];
+}
+
+- (void)rebuildUndoStack
+{
+    // Register dummy undo operations to enable Cmd-Z and Cmd-R
+    NSUndoManager *undoMgr = self.undoManager;
+    [undoMgr removeAllActions];
+    [undoMgr beginUndoGrouping];
+    [undoMgr registerUndoWithTarget:self selector:@selector(undo) object:nil];
+    [undoMgr endUndoGrouping];
+    [undoMgr beginUndoGrouping];
+    [undoMgr registerUndoWithTarget:self selector:@selector(registerRedo) object:nil];
+    [undoMgr endUndoGrouping];
+    [undoMgr undo];
 }
 
 // -------------------------------------------------------------------------

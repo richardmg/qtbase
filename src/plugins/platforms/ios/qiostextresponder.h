@@ -66,6 +66,8 @@ class QIOSInputContext;
 @property(nonatomic) UIReturnKeyType returnKeyType;
 @property(nonatomic, getter=isSecureTextEntry) BOOL secureTextEntry;
 
+@property(nonatomic, copy) NSString *title;
+
 // UITextInput
 @property(nonatomic, assign) id<UITextInputDelegate> inputDelegate;
 
