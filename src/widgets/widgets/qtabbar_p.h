@@ -150,7 +150,6 @@ public:
     int calculateNewPosition(int from, int to, int index) const;
     void slide(int from, int to);
     void init();
-    int extraWidth() const;
 
     Tab *at(int index);
     const Tab *at(int index) const;

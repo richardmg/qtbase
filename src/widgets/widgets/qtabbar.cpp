@@ -353,13 +353,6 @@ void QTabBar::initStyleOption(QStyleOptionTab *option, int tabIndex) const
     \since 5.2
 */
 
-int QTabBarPrivate::extraWidth() const
-{
-    Q_Q(const QTabBar);
-    return 2 * qMax(q->style()->pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, q),
-                    QApplication::globalStrut().width());
-}
-
 void QTabBarPrivate::init()
 {
     Q_Q(QTabBar);
@@ -413,7 +406,6 @@ int QTabBarPrivate::indexAtPos(const QPoint &p) const
 void QTabBarPrivate::layoutTabs()
 {
     Q_Q(QTabBar);
-    scrollOffset = 0;
     layoutDirty = false;
     QSize size = q->size();
     int last, available;
@@ -513,39 +505,22 @@ void QTabBarPrivate::layoutTabs()
     }
 
     if (useScrollButtons && tabList.count() && last > available) {
-        int extra = extraWidth();
-        if (!vertTabs) {
-            Qt::LayoutDirection ld = q->layoutDirection();
-            QRect arrows = QStyle::visualRect(ld, q->rect(),
-                                              QRect(available - extra, 0, extra, size.height()));
-            int buttonOverlap = q->style()->pixelMetric(QStyle::PM_TabBar_ScrollButtonOverlap, 0, q);
+        QStyleOptionTabBarBase optTabBase;
+        optTabBase.init(q);
+        QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+        scrollOffset = scrollRect.left();
 
-            if (ld == Qt::LeftToRight) {
-                leftB->setGeometry(arrows.left(), arrows.top(), extra/2, arrows.height());
-                rightB->setGeometry(arrows.right() - extra/2 + buttonOverlap, arrows.top(),
-                                    extra/2, arrows.height());
-                leftB->setArrowType(Qt::LeftArrow);
-                rightB->setArrowType(Qt::RightArrow);
-            } else {
-                rightB->setGeometry(arrows.left(), arrows.top(), extra/2, arrows.height());
-                leftB->setGeometry(arrows.right() - extra/2 + buttonOverlap, arrows.top(),
-                                    extra/2, arrows.height());
-                rightB->setArrowType(Qt::LeftArrow);
-                leftB->setArrowType(Qt::RightArrow);
-            }
-        } else {
-            QRect arrows = QRect(0, available - extra, size.width(), extra );
-            leftB->setGeometry(arrows.left(), arrows.top(), arrows.width(), extra/2);
-            leftB->setArrowType(Qt::UpArrow);
-            rightB->setGeometry(arrows.left(), arrows.bottom() - extra/2 + 1,
-                                arrows.width(), extra/2);
-            rightB->setArrowType(Qt::DownArrow);
-        }
-        leftB->setEnabled(scrollOffset > 0);
-        rightB->setEnabled(last - scrollOffset >= available - extra);
+        leftB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollLeftButton, &optTabBase, q));
+        leftB->setArrowType(q->layoutDirection() == Qt::LeftToRight ? Qt::LeftArrow : Qt::RightArrow);
+        leftB->setEnabled(scrollOffset > scrollRect.left());
         leftB->show();
+
+        rightB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollRightButton, &optTabBase, q));
+        rightB->setArrowType(q->layoutDirection() == Qt::LeftToRight ? Qt::RightArrow : Qt::LeftArrow);
+        rightB->setEnabled(last - scrollOffset > scrollRect.x() + scrollRect.width());
         rightB->show();
     } else {
+        scrollOffset = 0;
         rightB->hide();
         leftB->hide();
     }
@@ -563,17 +538,21 @@ void QTabBarPrivate::makeVisible(int index)
     const QRect tabRect = tabList.at(index).rect;
     const int oldScrollOffset = scrollOffset;
     const bool horiz = !verticalTabs(shape);
-    const int available = (horiz ? q->width() : q->height()) - extraWidth();
     const int start = horiz ? tabRect.left() : tabRect.top();
     const int end = horiz ? tabRect.right() : tabRect.bottom();
+
+    QStyleOptionTabBarBase optTabBase;
+    optTabBase.init(q);
+    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+
     if (start < scrollOffset) // too far left
-        scrollOffset = start - (index ? 8 : 0);
-    else if (end > scrollOffset + available) // too far right
-        scrollOffset = end - available + 1;
+        scrollOffset = start - (index ? 8 : scrollRect.left());
+    else if (end > scrollOffset + scrollRect.x() + scrollRect.width()) // too far right
+        scrollOffset = end - scrollRect.x() - scrollRect.width() + 1;
 
     leftB->setEnabled(scrollOffset > 0);
     const int last = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
-    rightB->setEnabled(last - scrollOffset >= available);
+    rightB->setEnabled(last - scrollOffset >= scrollRect.x() + scrollRect.width());
     if (oldScrollOffset != scrollOffset) {
         q->update();
         layoutWidgets();
@@ -670,6 +649,11 @@ void QTabBarPrivate::_q_scrollTabs()
     Q_Q(QTabBar);
     const QObject *sender = q->sender();
     int i = -1;
+
+    QStyleOptionTabBarBase optTabBase;
+    optTabBase.init(q);
+    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+
     if (!verticalTabs(shape)) {
         if (sender == leftB) {
             for (i = tabList.count() - 1; i >= 0; --i) {
@@ -679,9 +663,8 @@ void QTabBarPrivate::_q_scrollTabs()
                 }
             }
         } else if (sender == rightB) {
-            int availableWidth = q->width() - extraWidth();
             for (i = 0; i < tabList.count(); ++i) {
-                if (tabList.at(i).rect.right() - scrollOffset > availableWidth) {
+                if (tabList.at(i).rect.right() - scrollOffset > scrollRect.x() + scrollRect.width()) {
                     makeVisible(i);
                     return;
                 }
@@ -696,9 +679,8 @@ void QTabBarPrivate::_q_scrollTabs()
                 }
             }
         } else if (sender == rightB) {
-            int available = q->height() - extraWidth();
             for (i = 0; i < tabList.count(); ++i) {
-                if (tabList.at(i).rect.bottom() - scrollOffset > available) {
+                if (tabList.at(i).rect.bottom() - scrollOffset > scrollRect.y() + scrollRect.height()) {
                     makeVisible(i);
                     return;
                 }
@@ -1576,10 +1558,12 @@ void QTabBar::paintEvent(QPaintEvent *)
 
     QStylePainter p(this);
     int selected = -1;
-    int cut = -1;
+    int cutLeft = -1;
+    int cutRight = -1;
     bool rtl = optTabBase.direction == Qt::RightToLeft;
     bool vertical = verticalTabs(d->shape);
-    QStyleOptionTab cutTab;
+    QStyleOptionTab cutTabLeft;
+    QStyleOptionTab cutTabRight;
     selected = d->currentIndex;
     if (d->dragInProgress)
         selected = d->pressedIndex;
@@ -1605,13 +1589,31 @@ void QTabBar::paintEvent(QPaintEvent *)
         if (!(tab.state & QStyle::State_Enabled)) {
             tab.palette.setCurrentColorGroup(QPalette::Disabled);
         }
+
         // If this tab is partially obscured, make a note of it so that we can pass the information
         // along when we draw the tear.
-        if (((!vertical && (!rtl && tab.rect.left() < 0)) || (rtl && tab.rect.right() > width()))
-            || (vertical && tab.rect.top() < 0)) {
-            cut = i;
-            cutTab = tab;
+        if (!vertical) {
+            bool tabScrolledOutLeft = tab.rect.left() < 0;
+            bool tabScrolledOutRight = tab.rect.right() > width();
+            if ((!rtl && tabScrolledOutLeft) || (rtl && tabScrolledOutRight)) {
+                cutLeft = i;
+                cutTabLeft = tab;
+            } else if ((!rtl && tabScrolledOutRight) || (rtl && tabScrolledOutLeft)) {
+                cutRight = i;
+                cutTabRight = tab;
+            }
+        } else {
+            bool tabScrolledOutTop = tab.rect.top() < 0;
+            bool tabScrolledOutBottom = tab.rect.bottom() > height();
+            if (tabScrolledOutTop) {
+                cutLeft = i;
+                cutTabLeft = tab;
+            } else if (tabScrolledOutBottom){
+                cutRight = i;
+                cutTabRight = tab;
+            }
         }
+
         // Don't bother drawing a tab if the entire tab is outside of the visible tab bar.
         if ((!vertical && (tab.rect.right() < 0 || tab.rect.left() > width()))
             || (vertical && (tab.rect.bottom() < 0 || tab.rect.top() > height())))
@@ -1643,10 +1645,16 @@ void QTabBar::paintEvent(QPaintEvent *)
     }
 
     // Only draw the tear indicator if necessary. Most of the time we don't need too.
-    if (d->leftB->isVisible() && cut >= 0) {
-        cutTab.rect = rect();
-        cutTab.rect = style()->subElementRect(QStyle::SE_TabBarTearIndicator, &cutTab, this);
-        p.drawPrimitive(QStyle::PE_IndicatorTabTear, cutTab);
+    if (d->leftB->isVisible() && cutLeft >= 0) {
+        cutTabLeft.rect = rect();
+        cutTabLeft.rect = style()->subElementRect(QStyle::SE_TabBarTearIndicatorLeft, &cutTabLeft, this);
+        p.drawPrimitive(QStyle::PE_IndicatorTabTearLeft, cutTabLeft);
+    }
+
+    if (d->rightB->isVisible() && cutRight >= 0) {
+        cutTabRight.rect = rect();
+        cutTabRight.rect = style()->subElementRect(QStyle::SE_TabBarTearIndicatorRight, &cutTabRight, this);
+        p.drawPrimitive(QStyle::PE_IndicatorTabTearRight, cutTabRight);
     }
 }
 

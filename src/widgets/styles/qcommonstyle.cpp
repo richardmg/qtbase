@@ -2802,6 +2802,28 @@ QRect QCommonStyle::subElementRect(SubElement sr, const QStyleOption *opt,
             r = visualRect(opt->direction, opt->rect, r);
         }
         break;
+    case SE_TabBarScrollLeftButton: {
+        const bool vertical = opt->rect.width() < opt->rect.height();
+        const Qt::LayoutDirection ld = widget->layoutDirection();
+        const int buttonWidth = qMax(pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, widget), QApplication::globalStrut().width());
+        const int buttonOverlap = pixelMetric(QStyle::PM_TabBar_ScrollButtonOverlap, 0, widget);
+
+        r = vertical ? QRect(0, opt->rect.height() - (buttonWidth * 2) + buttonOverlap, opt->rect.width(), buttonWidth)
+            : QStyle::visualRect(ld, opt->rect, QRect(opt->rect.width() - (buttonWidth * 2) + buttonOverlap, 0, buttonWidth, opt->rect.height()));
+        break; }
+    case SE_TabBarScrollRightButton: {
+        const bool vertical = opt->rect.width() < opt->rect.height();
+        const Qt::LayoutDirection ld = widget->layoutDirection();
+        const int buttonWidth = qMax(pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, widget), QApplication::globalStrut().width());
+
+        r = vertical ? QRect(0, opt->rect.height() - buttonWidth, opt->rect.width(), buttonWidth)
+            : QStyle::visualRect(ld, opt->rect, QRect(opt->rect.width() - buttonWidth, 0, buttonWidth, opt->rect.height()));
+        break; }
+    case SE_TabBarScrollRect: {
+        QRect lb = subElementRect(SE_TabBarScrollLeftButton, opt, widget);
+        const bool vertical = opt->rect.width() < opt->rect.height();
+        r = vertical ? QRect(0, lb.y() + 1, 0, 0) : QRect(0, 0, lb.x() + 1, 0);
+        break; }
 #endif
     case SE_TreeViewDisclosureItem:
         r = opt->rect;
