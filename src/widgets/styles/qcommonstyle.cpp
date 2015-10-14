@@ -2831,7 +2831,8 @@ QRect QCommonStyle::subElementRect(SubElement sr, const QStyleOption *opt,
                     || base->shape == QTabBar::TriangularEast
                     || base->shape == QTabBar::TriangularWest;
 
-            r = vertical ? QRect(0, combinedWidth, 0, 0) : QRect(0, 0, combinedWidth, 0);
+            r = vertical ? QRect(0, combinedWidth, 0, 0)
+                         : QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, combinedWidth, 0));
         }
         break;
 #endif

@@ -545,6 +545,12 @@ void QTabBarPrivate::makeVisible(int index)
     optTabBase.init(q);
     QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
 
+    if (horiz && q->layoutDirection() == Qt::RightToLeft) {
+        // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
+        // to reverse scrollRect back to LeftToRight before they can be compared.
+        scrollRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), scrollRect);
+    }
+
     if (start < scrollOffset) // too far left
         scrollOffset = start - (index ? 8 : scrollRect.left());
     else if (end > scrollOffset + scrollRect.x() + scrollRect.width()) // too far right
