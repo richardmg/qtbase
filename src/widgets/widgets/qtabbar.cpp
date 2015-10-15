@@ -553,7 +553,7 @@ void QTabBarPrivate::makeVisible(int index)
     }
 
     if (start < scrollRect.left() + scrollOffset) // too far left
-        scrollOffset = start - scrollRect.left() - (index ? 8 : 0);
+        scrollOffset = start - scrollRect.left();
     else if (end > scrollRect.right() + scrollOffset) // too far right
         scrollOffset = end - scrollRect.right();
 
