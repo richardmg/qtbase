@@ -540,6 +540,7 @@ void QTabBarPrivate::makeVisible(int index)
     const bool horiz = !verticalTabs(shape);
     const int start = horiz ? tabRect.left() : tabRect.top();
     const int end = horiz ? tabRect.right() : tabRect.bottom();
+    const int last = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
 
     QStyleOptionTabBarBase optTabBase;
     optTabBase.init(q);
@@ -551,14 +552,14 @@ void QTabBarPrivate::makeVisible(int index)
         scrollRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), scrollRect);
     }
 
-    if (start < scrollOffset) // too far left
-        scrollOffset = start - (index ? 8 : scrollRect.left());
-    else if (end > scrollOffset + scrollRect.x() + scrollRect.width()) // too far right
-        scrollOffset = end - scrollRect.x() - scrollRect.width() + 1;
+    if (start < scrollRect.left() + scrollOffset) // too far left
+        scrollOffset = start - scrollRect.left() - (index ? 8 : 0);
+    else if (end > scrollRect.right() + scrollOffset) // too far right
+        scrollOffset = end - scrollRect.right();
 
-    leftB->setEnabled(scrollOffset > 0);
-    const int last = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
-    rightB->setEnabled(last - scrollOffset >= scrollRect.x() + scrollRect.width());
+    leftB->setEnabled(scrollOffset > -scrollRect.left());
+    rightB->setEnabled(last - scrollOffset > scrollRect.right());
+
     if (oldScrollOffset != scrollOffset) {
         q->update();
         layoutWidgets();
@@ -654,23 +655,29 @@ void QTabBarPrivate::_q_scrollTabs()
 {
     Q_Q(QTabBar);
     const QObject *sender = q->sender();
+    const bool horizontal = !verticalTabs(shape);
     int i = -1;
 
     QStyleOptionTabBarBase optTabBase;
     optTabBase.init(q);
     QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+    if (horizontal && q->layoutDirection() == Qt::RightToLeft) {
+        // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
+        // to reverse scrollRect back to LeftToRight before they can be compared.
+        scrollRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), scrollRect);
+    }
 
-    if (!verticalTabs(shape)) {
+    if (horizontal) {
         if (sender == leftB) {
             for (i = tabList.count() - 1; i >= 0; --i) {
-                if (tabList.at(i).rect.left() - scrollOffset < 0) {
+                if (tabList.at(i).rect.left() < scrollRect.left() + scrollOffset) {
                     makeVisible(i);
                     return;
                 }
             }
         } else if (sender == rightB) {
             for (i = 0; i < tabList.count(); ++i) {
-                if (tabList.at(i).rect.right() - scrollOffset > scrollRect.x() + scrollRect.width()) {
+                if (tabList.at(i).rect.right() > scrollRect.right() + scrollOffset) {
                     makeVisible(i);
                     return;
                 }
@@ -1574,6 +1581,13 @@ void QTabBar::paintEvent(QPaintEvent *)
     if (d->dragInProgress)
         selected = d->pressedIndex;
 
+    QRect scrollRect = style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, this);
+    if (!vertical && layoutDirection() == Qt::RightToLeft) {
+        // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
+        // to reverse scrollRect back to LeftToRight before they can be compared.
+        scrollRect = QStyle::visualRect(Qt::RightToLeft, rect(), scrollRect);
+    }
+
     for (int i = 0; i < d->tabList.count(); ++i)
          optTabBase.tabBarRect |= tabRect(i);
 
@@ -1599,8 +1613,8 @@ void QTabBar::paintEvent(QPaintEvent *)
         // If this tab is partially obscured, make a note of it so that we can pass the information
         // along when we draw the tear.
         if (!vertical) {
-            bool tabScrolledOutLeft = tab.rect.left() < 0;
-            bool tabScrolledOutRight = tab.rect.right() > width();
+            bool tabScrolledOutLeft = tab.rect.left() < scrollRect.left();
+            bool tabScrolledOutRight = tab.rect.right() > scrollRect.right();
             if ((!rtl && tabScrolledOutLeft) || (rtl && tabScrolledOutRight)) {
                 cutLeft = i;
                 cutTabLeft = tab;
