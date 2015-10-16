@@ -539,8 +539,8 @@ QRect QTabBarPrivate::tabBarScrollRect()
     QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &opt, q);
 
     if (!verticalTabs(shape) && q->layoutDirection() == Qt::RightToLeft) {
-        // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
-        // to reverse scrollRect back to LeftToRight before they can be compared.
+        // The tabs are always laid out left-to-right, so in order to compare them
+        // agains style rects, the style rects will need to be left-to-right too.
         scrollRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), scrollRect);
     }
 
@@ -560,16 +560,34 @@ void QTabBarPrivate::makeVisible(int index)
     const int tabEnd = horiz ? tabRect.right() : tabRect.bottom();
     const int lastTabEnd = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
     const QRect scrollRect = tabBarScrollRect();
-
     const int scrolledTabBarStart = scrollRect.left() + scrollOffset;
     const int scrolledTabBarEnd = scrollRect.right() + scrollOffset;
 
+    QStyleOptionTab opt;
+    q->initStyleOption(&opt, index);
+    opt.rect = q->rect();
+    QRect tearLeftRect = q->style()->subElementRect(QStyle::SE_TabBarTearIndicatorLeft, &opt, q);
+    QRect tearRightRect = q->style()->subElementRect(QStyle::SE_TabBarTearIndicatorRight, &opt, q);
+
+    if (!verticalTabs(shape) && q->layoutDirection() == Qt::RightToLeft) {
+        // The tabs are always laid out left-to-right, so in order to compare them
+        // agains style rects, the style rects will need to be left-to-right too.
+        tearLeftRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), tearLeftRect);
+        tearRightRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), tearRightRect);
+    }
+
     if (tabStart < scrolledTabBarStart) {
         // Tab is outside on the left, so scroll left.
-        scrollOffset = tabStart - scrollRect.left() - (index ? 8 : 0);
+        if (index == 0)
+            scrollOffset = tabStart - scrollRect.left();
+        else
+            scrollOffset = tabStart - tearLeftRect.x() - tearLeftRect.width();
     } else if (tabEnd > scrolledTabBarEnd) {
         // Tab is outside on the right, so scroll right.
-        scrollOffset = tabEnd - scrollRect.right();
+        if (index == tabList.size() - 1)
+            scrollOffset = tabEnd - scrollRect.right();
+        else
+            scrollOffset = tabEnd - (tearRightRect.isEmpty() ? scrollRect.right() : tearRightRect.x());
     }
 
     leftB->setEnabled(scrollOffset > -scrollRect.left());

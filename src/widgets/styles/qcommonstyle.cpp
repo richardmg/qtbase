@@ -2828,10 +2828,10 @@ QRect QCommonStyle::subElementRect(SubElement sr, const QStyleOption *opt,
 
         if (vertical) {
             const int scrollSpace = opt->rect.height() - (buttonWidth * 2) + buttonOverlap + 1;
-            r = QRect(0, 0, scrollSpace, 0);
+            r = QRect(0, 0, scrollSpace, opt->rect.height());
         } else {
             const int scrollSpace = opt->rect.width() - (buttonWidth * 2) + buttonOverlap + 1;
-            r = QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, scrollSpace, 0));
+            r = QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, scrollSpace, opt->rect.height()));
         }
         break; }
 #endif
