@@ -2819,22 +2819,17 @@ QRect QCommonStyle::subElementRect(SubElement sr, const QStyleOption *opt,
         r = vertical ? QRect(0, opt->rect.height() - buttonWidth, opt->rect.width(), buttonWidth)
             : QStyle::visualRect(ld, opt->rect, QRect(opt->rect.width() - buttonWidth, 0, buttonWidth, opt->rect.height()));
         break; }
-    case SE_TabBarScrollRect:
-        if (const QStyleOptionTabBarBase *base = qstyleoption_cast<const QStyleOptionTabBarBase *>(opt)) {
-            // Return the rect between the scroll buttons. A smaller rect will add more margins between
-            // buttons and tabs. If a tab is outside the scroll rect, the scroll buttons will be enabled.
-            const int buttonWidth = pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, widget);
-            const int buttonOverlap = pixelMetric(QStyle::PM_TabBar_ScrollButtonOverlap, 0, widget);
-            const int combinedWidth = opt->rect.width() - (buttonWidth * 2) + buttonOverlap + 1;
-            const bool vertical = base->shape == QTabBar::RoundedEast
-                    || base->shape == QTabBar::RoundedWest
-                    || base->shape == QTabBar::TriangularEast
-                    || base->shape == QTabBar::TriangularWest;
+    case SE_TabBarScrollRect: {
+        // Return the rect between the scroll buttons. A smaller rect will add more margins between
+        // buttons and tabs. If a tab is outside the scroll rect, the scroll buttons will be enabled.
+        const int buttonWidth = pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, widget);
+        const int buttonOverlap = pixelMetric(QStyle::PM_TabBar_ScrollButtonOverlap, 0, widget);
+        const int combinedWidth = opt->rect.width() - (buttonWidth * 2) + buttonOverlap + 1;
+        const bool vertical = opt->rect.height() > opt->rect.width();
 
-            r = vertical ? QRect(0, combinedWidth, 0, 0)
-                         : QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, combinedWidth, 0));
-        }
-        break;
+        r = vertical ? QRect(0, combinedWidth, 0, 0)
+                     : QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, combinedWidth, 0));
+        break; }
 #endif
     case SE_TreeViewDisclosureItem:
         r = opt->rect;

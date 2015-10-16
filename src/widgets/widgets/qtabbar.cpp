@@ -505,17 +505,17 @@ void QTabBarPrivate::layoutTabs()
     }
 
     if (useScrollButtons && tabList.count() && last > available) {
-        QStyleOptionTabBarBase optTabBase;
-        optTabBase.init(q);
-        QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+        QStyleOption opt;
+        opt.init(q);
+        QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &opt, q);
         scrollOffset = scrollRect.left();
 
-        leftB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollLeftButton, &optTabBase, q));
+        leftB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollLeftButton, &opt, q));
         leftB->setArrowType(q->layoutDirection() == Qt::LeftToRight ? Qt::LeftArrow : Qt::RightArrow);
         leftB->setEnabled(scrollOffset > scrollRect.left());
         leftB->show();
 
-        rightB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollRightButton, &optTabBase, q));
+        rightB->setGeometry(q->style()->subElementRect(QStyle::SE_TabBarScrollRightButton, &opt, q));
         rightB->setArrowType(q->layoutDirection() == Qt::LeftToRight ? Qt::RightArrow : Qt::LeftArrow);
         rightB->setEnabled(last - scrollOffset > scrollRect.x() + scrollRect.width());
         rightB->show();
@@ -538,13 +538,13 @@ void QTabBarPrivate::makeVisible(int index)
     const QRect tabRect = tabList.at(index).rect;
     const int oldScrollOffset = scrollOffset;
     const bool horiz = !verticalTabs(shape);
-    const int start = horiz ? tabRect.left() : tabRect.top();
-    const int end = horiz ? tabRect.right() : tabRect.bottom();
-    const int last = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
+    const int tabStart = horiz ? tabRect.left() : tabRect.top();
+    const int tabEnd = horiz ? tabRect.right() : tabRect.bottom();
+    const int lastTabEnd = horiz ? tabList.last().rect.right() : tabList.last().rect.bottom();
 
-    QStyleOptionTabBarBase optTabBase;
-    optTabBase.init(q);
-    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+    QStyleOption opt;
+    opt.init(q);
+    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &opt, q);
 
     if (horiz && q->layoutDirection() == Qt::RightToLeft) {
         // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
@@ -552,13 +552,19 @@ void QTabBarPrivate::makeVisible(int index)
         scrollRect = QStyle::visualRect(Qt::RightToLeft, q->rect(), scrollRect);
     }
 
-    if (start < scrollRect.left() + scrollOffset) // too far left
-        scrollOffset = start - scrollRect.left();
-    else if (end > scrollRect.right() + scrollOffset) // too far right
-        scrollOffset = end - scrollRect.right();
+    const int scrolledTabBarStart = scrollRect.left() + scrollOffset;
+    const int scrolledTabBarEnd = scrollRect.right() + scrollOffset;
+
+    if (tabStart < scrolledTabBarStart) {
+        // Tab is outside on the left, so scroll left.
+        scrollOffset = tabStart - scrollRect.left() - (index ? 8 : 0);
+    } else if (tabEnd > scrolledTabBarEnd) {
+        // Tab is outside on the right, so scroll right.
+        scrollOffset = tabEnd - scrollRect.right();
+    }
 
     leftB->setEnabled(scrollOffset > -scrollRect.left());
-    rightB->setEnabled(last - scrollOffset > scrollRect.right());
+    rightB->setEnabled(scrollOffset < lastTabEnd - scrollRect.right());
 
     if (oldScrollOffset != scrollOffset) {
         q->update();
@@ -658,9 +664,9 @@ void QTabBarPrivate::_q_scrollTabs()
     const bool horizontal = !verticalTabs(shape);
     int i = -1;
 
-    QStyleOptionTabBarBase optTabBase;
-    optTabBase.init(q);
-    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &optTabBase, q);
+    QStyleOption opt;
+    opt.init(q);
+    QRect scrollRect = q->style()->subElementRect(QStyle::SE_TabBarScrollRect, &opt, q);
     if (horizontal && q->layoutDirection() == Qt::RightToLeft) {
         // Since tabRect (including start and end) is not adjusted for Qt::LeftToRight, we need
         // to reverse scrollRect back to LeftToRight before they can be compared.
