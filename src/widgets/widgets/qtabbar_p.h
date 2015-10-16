@@ -177,6 +177,7 @@ public:
     bool isTabInMacUnifiedToolbarArea() const;
     void setupMovableTab();
     void autoHideTabs();
+    QRect tabBarScrollRect();
 
     void makeVisible(int index);
     QSize iconSize;
