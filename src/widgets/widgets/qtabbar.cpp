@@ -692,14 +692,14 @@ void QTabBarPrivate::_q_scrollTabs()
     } else { // vertical
         if (sender == leftB) {
             for (i = tabList.count() - 1; i >= 0; --i) {
-                if (tabList.at(i).rect.top() - scrollOffset < 0) {
+                if (tabList.at(i).rect.top() < scrollRect.left() + scrollOffset) {
                     makeVisible(i);
                     return;
                 }
             }
         } else if (sender == rightB) {
             for (i = 0; i < tabList.count(); ++i) {
-                if (tabList.at(i).rect.bottom() - scrollOffset > scrollRect.y() + scrollRect.height()) {
+                if (tabList.at(i).rect.bottom() > scrollRect.right() + scrollOffset) {
                     makeVisible(i);
                     return;
                 }

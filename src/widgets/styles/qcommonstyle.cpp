@@ -2824,11 +2824,15 @@ QRect QCommonStyle::subElementRect(SubElement sr, const QStyleOption *opt,
         // buttons and tabs. If a tab is outside the scroll rect, the scroll buttons will be enabled.
         const int buttonWidth = pixelMetric(QStyle::PM_TabBarScrollButtonWidth, 0, widget);
         const int buttonOverlap = pixelMetric(QStyle::PM_TabBar_ScrollButtonOverlap, 0, widget);
-        const int combinedWidth = opt->rect.width() - (buttonWidth * 2) + buttonOverlap + 1;
         const bool vertical = opt->rect.height() > opt->rect.width();
 
-        r = vertical ? QRect(0, combinedWidth, 0, 0)
-                     : QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, combinedWidth, 0));
+        if (vertical) {
+            const int scrollSpace = opt->rect.height() - (buttonWidth * 2) + buttonOverlap + 1;
+            r = QRect(0, 0, scrollSpace, 0);
+        } else {
+            const int scrollSpace = opt->rect.width() - (buttonWidth * 2) + buttonOverlap + 1;
+            r = QStyle::visualRect(widget->layoutDirection(), opt->rect, QRect(0, 0, scrollSpace, 0));
+        }
         break; }
 #endif
     case SE_TreeViewDisclosureItem:
