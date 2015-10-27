@@ -63,6 +63,8 @@ QPointF fromCGPoint(const CGPoint &point);
 Qt::ScreenOrientation toQtScreenOrientation(UIDeviceOrientation uiDeviceOrientation);
 UIDeviceOrientation fromQtScreenOrientation(Qt::ScreenOrientation qtOrientation);
 
+QString removeMnemonics(const QString &original);
+
 int infoPlistValue(NSString* key, int defaultValue);
 
 QT_END_NAMESPACE
