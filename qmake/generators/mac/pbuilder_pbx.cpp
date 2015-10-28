@@ -853,8 +853,8 @@ ProjectBuilderMakefileGenerator::writeMakeParts(QTextStream &t)
                                                 QString librarySuffix = project->first("QMAKE_XCODE_LIBRARY_SUFFIX").toQString();
                                                 suffixSetting = "$(" + suffixSetting + ")";
                                                 if (!librarySuffix.isEmpty()) {
-                                                    library.replace(librarySuffix, suffixSetting);
-                                                    name.remove(librarySuffix);
+                                                    library.replace(library.lastIndexOf(librarySuffix), librarySuffix.length(), suffixSetting);
+                                                    name.remove(name.lastIndexOf(librarySuffix), librarySuffix.length());
                                                 } else {
                                                     library.replace(name, name + suffixSetting);
                                                 }
