@@ -450,6 +450,8 @@ ProjectBuilderSources::ProjectBuilderSources(const QString &k, bool b, const QSt
         group = "Generated Sources";
     else if (k == "RESOURCES")
         group = "Resources";
+    else if (k == "OTHER_FILES")
+        group = "Other Files";
     else if (group.isNull())
         group = QString("Sources [") + c + "]";
 }
@@ -573,6 +575,7 @@ ProjectBuilderMakefileGenerator::writeMakeParts(QTextStream &t)
     sources.append(ProjectBuilderSources("GENERATED_SOURCES", true));
     sources.append(ProjectBuilderSources("GENERATED_FILES"));
     sources.append(ProjectBuilderSources("HEADERS"));
+    sources.append(ProjectBuilderSources("OTHER_FILES"));
     sources.append(ProjectBuilderSources("QMAKE_INTERNAL_INCLUDED_FILES"));
     if(!project->isEmpty("QMAKE_EXTRA_COMPILERS")) {
         const ProStringList &quc = project->values("QMAKE_EXTRA_COMPILERS");
