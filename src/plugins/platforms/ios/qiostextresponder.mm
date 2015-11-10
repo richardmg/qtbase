@@ -36,6 +36,7 @@
 #include "qiosglobal.h"
 #include "qiosinputcontext.h"
 #include "quiview.h"
+#include "qiosmenu.h"
 
 #include <QtCore/qscopedvaluerollback.h>
 
@@ -355,75 +356,73 @@
 
 #ifndef QT_NO_SHORTCUT
 
-- (void)sendShortcut:(QKeySequence::StandardKey)standardKey
+static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
+    {@selector(cut:), QKeySequence::Cut},
+    {@selector(copy:), QKeySequence::Copy},
+    {@selector(paste:), QKeySequence::Paste},
+    {@selector(selectAll:), QKeySequence::SelectAll},
+    {@selector(delete:), QKeySequence::Delete},
+    {@selector(toggleBoldface:), QKeySequence::Bold},
+    {@selector(toggleItalics:), QKeySequence::Italic},
+    {@selector(toggleUnderline:), QKeySequence::Underline},
+    {@selector(undo:), QKeySequence::Undo},
+    {@selector(redo:), QKeySequence::Redo}
+};
+
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender
 {
-    const int keys = QKeySequence(standardKey)[0];
-    Qt::Key key = Qt::Key(keys & 0x0000FFFF);
-    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
-    [self sendKeyPressRelease:key modifiers:modifiers];
+    // We normally enable all edit actions by default in case the app is listening
+    // for shortcuts. But if a edit menu is showing, we require the menu to contain
+    // items with the corresponding StandardKeys as well. Otherwise the menu will
+    // end up with edit actions that the app didn't request.
+    QKeySequence::StandardKey standardKey = standardKeyHash[action];
+    if (standardKey != QKeySequence::UnknownKey) {
+        QIOSMenu *menu = QIOSMenu::currentMenu();
+        if (!menu)
+            return YES;
+
+        QKeySequence shortcut(standardKey);
+        QIOSMenuItemList menuItems = menu->effectiveMenuItems();
+        for (int i = 0; i < menuItems.count(); ++i) {
+            if (shortcut == menuItems.at(i)->m_shortcut)
+                return YES;
+        }
+    }
+
+    return [super canPerformAction:action withSender:sender];
 }
 
-- (void)cut:(id)sender
+- (void)forwardInvocation:(NSInvocation *)invocation
 {
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Cut];
+    // If the invocation is an edit action, send a shortcut key to Qt
+    QKeySequence::StandardKey standardKey = standardKeyHash[invocation.selector];
+    if (standardKey != QKeySequence::UnknownKey) {
+        const int keys = QKeySequence(standardKey)[0];
+        Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+        Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+        [self sendKeyPressRelease:key modifiers:modifiers];
+
+        if (standardKey == QKeySequence::Undo || standardKey == QKeySequence::Redo)
+            [self rebuildUndoStack];
+
+        return;
+    }
+
+    [super forwardInvocation:invocation];
 }
 
-- (void)copy:(id)sender
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)selector
 {
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Copy];
-}
+    if (standardKeyHash[selector] != QKeySequence::UnknownKey) {
+        // Just return a dummy signature that NSObject can create an NSInvocation from.
+        // We end up only checking selector in forwardInvocation anyway.
+        return [super methodSignatureForSelector:@selector(methodSignatureForSelector:)];
+    }
 
-- (void)paste:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Paste];
-}
-
-- (void)selectAll:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::SelectAll];
-}
-
-- (void)delete:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Delete];
-}
-
-- (void)toggleBoldface:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Bold];
-}
-
-- (void)toggleItalics:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Italic];
-}
-
-- (void)toggleUnderline:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Underline];
+    return [super methodSignatureForSelector:selector];
 }
 
 // -------------------------------------------------------------------------
-
-- (void)undo
-{
-    [self sendShortcut:QKeySequence::Undo];
-    [self rebuildUndoStack];
-}
-
-- (void)redo
-{
-    [self sendShortcut:QKeySequence::Redo];
-    [self rebuildUndoStack];
-}
 
 - (void)registerRedo
 {

@@ -437,6 +437,8 @@ void QIOSMenu::showPopup(const QWindow *parentWindow, const QRect &targetRect, c
 
     m_currentMenu = this;
     m_effectiveMenuType = m_menuType;
+    m_effectiveMenuItems = visibleMenuItems();
+
     connect(qGuiApp, &QGuiApplication::focusObjectChanged, this, &QIOSMenu::dismiss);
 
     switch (m_effectiveMenuType) {
@@ -474,7 +476,7 @@ void QIOSMenu::toggleShowUsingUIMenuController(bool show)
 {
     if (show) {
         Q_ASSERT(!m_menuController);
-        m_menuController = [[QUIMenuController alloc] initWithVisibleMenuItems:filterFirstResponderActions(visibleMenuItems())];
+        m_menuController = [[QUIMenuController alloc] initWithVisibleMenuItems:filterFirstResponderActions(m_effectiveMenuItems)];
         repositionMenu();
         connect(qGuiApp->inputMethod(), &QInputMethod::keyboardRectangleChanged, this, &QIOSMenu::repositionMenu);
     } else {
@@ -493,7 +495,7 @@ void QIOSMenu::toggleShowUsingUIPickerView(bool show)
 
     if (show) {
         Q_ASSERT(!m_pickerView);
-        m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:visibleMenuItems() selectItem:m_targetItem];
+        m_pickerView = [[QUIPickerView alloc] initWithVisibleMenuItems:m_effectiveMenuItems selectItem:m_targetItem];
 
         Q_ASSERT(!focusObjectWithPickerView);
         focusObjectWithPickerView = qApp->focusWindow()->focusObject();

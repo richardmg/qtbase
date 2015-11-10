@@ -111,6 +111,7 @@ public:
 
     static QIOSMenu *currentMenu() { return m_currentMenu; }
     static id menuActionTarget() { return m_currentMenu ? m_currentMenu->m_menuController : 0; }
+    QIOSMenuItemList effectiveMenuItems() { return m_effectiveMenuItems; }
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) Q_DECL_OVERRIDE;
@@ -128,6 +129,7 @@ private:
     QUIMenuController *m_menuController;
     QUIPickerView *m_pickerView;
     QIOSMenuItemList m_menuItems;
+    QIOSMenuItemList m_effectiveMenuItems;
 
     static QIOSMenu *m_currentMenu;
 
