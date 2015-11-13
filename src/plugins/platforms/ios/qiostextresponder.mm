@@ -365,8 +365,8 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
     {@selector(toggleBoldface:), QKeySequence::Bold},
     {@selector(toggleItalics:), QKeySequence::Italic},
     {@selector(toggleUnderline:), QKeySequence::Underline},
-    {@selector(undo:), QKeySequence::Undo},
-    {@selector(redo:), QKeySequence::Redo}
+    {@selector(undo), QKeySequence::Undo},
+    {@selector(redo), QKeySequence::Redo}
 };
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender
@@ -376,50 +376,56 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
     // items with the corresponding StandardKeys as well. Otherwise the menu will
     // end up with edit actions that the app didn't request.
     QKeySequence::StandardKey standardKey = standardKeyHash[action];
-    if (standardKey != QKeySequence::UnknownKey) {
-        QIOSMenu *menu = QIOSMenu::currentMenu();
-        if (!menu)
-            return YES;
+    if (standardKey == QKeySequence::UnknownKey)
+        return [super canPerformAction:action withSender:sender];
 
-        QKeySequence shortcut(standardKey);
+    QIOSMenu *menu = QIOSMenu::currentMenu();
+    QKeySequence shortcut(standardKey);
+
+//        const QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
+//        if (standardKey == QKeySequence::Bold) {
+//            qDebug() << "has shortcut:" << shortcut << shortcutMap.hasShortcutForKeySequence(shortcut);
+//        }
+
+    if (menu) {
         QIOSMenuItemList menuItems = menu->effectiveMenuItems();
         for (int i = 0; i < menuItems.count(); ++i) {
             if (shortcut == menuItems.at(i)->m_shortcut)
                 return YES;
         }
+    } else {
+        const QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
+        if (shortcutMap.hasShortcutForKeySequence(shortcut))
+            return YES;
     }
 
-    return [super canPerformAction:action withSender:sender];
+    return NO;
 }
 
 - (void)forwardInvocation:(NSInvocation *)invocation
 {
     // If the invocation is an edit action, send a shortcut key to Qt
     QKeySequence::StandardKey standardKey = standardKeyHash[invocation.selector];
-    if (standardKey != QKeySequence::UnknownKey) {
-        const int keys = QKeySequence(standardKey)[0];
-        Qt::Key key = Qt::Key(keys & 0x0000FFFF);
-        Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
-        [self sendKeyPressRelease:key modifiers:modifiers];
+    if (standardKey == QKeySequence::UnknownKey)
+        return [super forwardInvocation:invocation];
 
-        if (standardKey == QKeySequence::Undo || standardKey == QKeySequence::Redo)
-            [self rebuildUndoStack];
+    const int keys = QKeySequence(standardKey)[0];
+    Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+    [self sendKeyPressRelease:key modifiers:modifiers];
 
-        return;
-    }
-
-    [super forwardInvocation:invocation];
+    if (standardKey == QKeySequence::Undo || standardKey == QKeySequence::Redo)
+        [self rebuildUndoStack];
 }
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)selector
 {
-    if (standardKeyHash[selector] != QKeySequence::UnknownKey) {
-        // Just return a dummy signature that NSObject can create an NSInvocation from.
-        // We end up only checking selector in forwardInvocation anyway.
-        return [super methodSignatureForSelector:@selector(methodSignatureForSelector:)];
-    }
+    if (standardKeyHash[selector] == QKeySequence::UnknownKey)
+        return [super methodSignatureForSelector:selector];
 
-    return [super methodSignatureForSelector:selector];
+    // Just return a dummy signature that NSObject can create an NSInvocation from.
+    // We end up only checking selector in forwardInvocation anyway.
+    return [super methodSignatureForSelector:@selector(methodSignatureForSelector:)];
 }
 
 // -------------------------------------------------------------------------

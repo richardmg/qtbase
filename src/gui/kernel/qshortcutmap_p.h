@@ -54,7 +54,7 @@ QT_BEGIN_NAMESPACE
 #ifndef QT_NO_SHORTCUT
 
 // To enable dump output uncomment below
-//#define Dump_QShortcutMap
+#define Dump_QShortcutMap
 
 class QKeyEvent;
 struct QShortcutEntry;
