@@ -371,21 +371,15 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender
 {
-    // We normally enable all edit actions by default in case the app is listening
-    // for shortcuts. But if a edit menu is showing, we require the menu to contain
-    // items with the corresponding StandardKeys as well. Otherwise the menu will
-    // end up with edit actions that the app didn't request.
+    // We only enable en edit action (including the button on on the virtual
+    // keyboard and the menu item inside the edit menu) if anyone is listening
+    // for the corresponding shortcut.
     QKeySequence::StandardKey standardKey = standardKeyHash[action];
     if (standardKey == QKeySequence::UnknownKey)
         return [super canPerformAction:action withSender:sender];
 
     QIOSMenu *menu = QIOSMenu::currentMenu();
     QKeySequence shortcut(standardKey);
-
-//        const QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
-//        if (standardKey == QKeySequence::Bold) {
-//            qDebug() << "has shortcut:" << shortcut << shortcutMap.hasShortcutForKeySequence(shortcut);
-//        }
 
     if (menu) {
         QIOSMenuItemList menuItems = menu->effectiveMenuItems();
@@ -396,6 +390,16 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
     } else {
         const QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
         if (shortcutMap.hasShortcutForKeySequence(shortcut))
+            return YES;
+
+        unsigned long time = QWindowSystemInterfacePrivate::eventTime.elapsed();
+        const int keys = QKeySequence(standardKey)[0];
+        Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+        Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+        QWindowSystemInterfacePrivate::KeyEvent *shortcutOverrideEvent = new QWindowSystemInterfacePrivate::KeyEvent(
+                    qApp->focusWindow(), time, QEvent::ShortcutOverride, key, modifiers, 0, 0, 0, QString(), false, 1);
+
+        if (QWindowSystemInterfacePrivate::handleWindowSystemEvent(shortcutOverrideEvent))
             return YES;
     }
 
@@ -440,6 +444,9 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
 
 - (void)rebuildUndoStack
 {
+    if (![self canPerformAction:@selector(undo) withSender:self])
+        return;
+
     dispatch_async(dispatch_get_main_queue (), ^{
         // Register dummy undo/redo operations to enable Cmd-Z and Cmd-Shift-Z
         // Ensure we do this outside any undo/redo callback since NSUndoManager
