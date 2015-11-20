@@ -377,39 +377,28 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
 
 
     // todo: cache for focus object
-
-    //cannot find shortcutoverride handler in qquickwindow...
+    qDebug() << "focus object:" << qApp->focusWindow() << qApp->focusObject();
 
     QKeySequence::StandardKey standardKey = standardKeyHash[action];
     if (standardKey == QKeySequence::UnknownKey)
         return [super canPerformAction:action withSender:sender];
 
-    QIOSMenu *menu = QIOSMenu::currentMenu();
     QKeySequence shortcut(standardKey);
 
-    if (menu) {
-        QIOSMenuItemList menuItems = menu->effectiveMenuItems();
-        for (int i = 0; i < menuItems.count(); ++i) {
-            if (shortcut == menuItems.at(i)->m_shortcut)
-                return YES;
-        }
+    if (QGuiApplicationPrivate::instance()->shortcutMap.hasShortcutForKeySequence(shortcut)) {
+        qDebug() << "found shortcut:" << shortcut;
+        return YES;
+    }
+
+    const int keys = QKeySequence(standardKey)[0];
+    Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+
+    if (QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers)) {
+        qDebug() << "* found override:" << shortcut;
+        return YES;
     } else {
-        const QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
-        if (shortcutMap.hasShortcutForKeySequence(shortcut)) {
-            qDebug() << "found shortcut:" << shortcut;
-            return YES;
-        }
-
-        const int keys = QKeySequence(standardKey)[0];
-        Qt::Key key = Qt::Key(keys & 0x0000FFFF);
-        Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
-
-        if (QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers)) {
-            qDebug() << "* found override:" << shortcut;
-            return YES;
-        } else {
-            qDebug() << "no override:" << shortcut;
-        }
+        qDebug() << "no override:" << shortcut;
     }
 
     return NO;
