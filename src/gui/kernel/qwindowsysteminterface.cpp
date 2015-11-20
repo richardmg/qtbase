@@ -198,32 +198,51 @@ void QWindowSystemInterface::handleFrameStrutMouseEvent(QWindow *w, ulong timest
     QWindowSystemInterfacePrivate::handleWindowSystemEvent(e);
 }
 
-bool QWindowSystemInterface::handleShortcutEvent(QWindow *window, ulong timestamp, int keyCode, Qt::KeyboardModifiers modifiers, quint32 nativeScanCode,
+bool QWindowSystemInterface::tryShortcutOverride(QWindow *window, ulong timestamp, int keyCode, Qt::KeyboardModifiers modifiers, quint32 nativeScanCode,
                                       quint32 nativeVirtualKey, quint32 nativeModifiers, const QString &text, bool autorepeat, ushort count)
 {
 #ifndef QT_NO_SHORTCUT
     if (!window)
         window = QGuiApplication::focusWindow();
+    if (!timestamp)
+        timestamp = QWindowSystemInterfacePrivate::eventTime.elapsed();
 
     QShortcutMap &shortcutMap = QGuiApplicationPrivate::instance()->shortcutMap;
-    if (shortcutMap.state() == QKeySequence::NoMatch) {
-        // Check if the shortcut is overridden by some object in the event delivery path (typically the focus object).
-        // If so, we should not look up the shortcut in the shortcut map, but instead deliver the event as a regular
-        // key event, so that the target that accepted the shortcut override event can handle it. Note that we only
-        // do this if the shortcut map hasn't found a partial shortcut match yet. If it has, the shortcut can not be
-        // overridden.
-        QWindowSystemInterfacePrivate::KeyEvent *shortcutOverrideEvent = new QWindowSystemInterfacePrivate::KeyEvent(window, timestamp,
-            QEvent::ShortcutOverride, keyCode, modifiers, nativeScanCode, nativeVirtualKey, nativeModifiers, text, autorepeat, count);
+    if (shortcutMap.state() != QKeySequence::NoMatch)
+        return false;
 
-        {
-            // FIXME: Template handleWindowSystemEvent to support both sync and async delivery
-            QScopedValueRollback<bool> syncRollback(QWindowSystemInterfacePrivate::synchronousWindowSystemEvents);
-            QWindowSystemInterfacePrivate::synchronousWindowSystemEvents = true;
+    // Check if the shortcut is overridden by some object in the event delivery path (typically the focus object).
+    // If so, we should not look up the shortcut in the shortcut map, but instead deliver the event as a regular
+    // key event, so that the target that accepted the shortcut override event can handle it. Note that we only
+    // do this if the shortcut map hasn't found a partial shortcut match yet. If it has, the shortcut can not be
+    // overridden.
+    QWindowSystemInterfacePrivate::KeyEvent *shortcutOverrideEvent = new QWindowSystemInterfacePrivate::KeyEvent(window, timestamp,
+        QEvent::ShortcutOverride, keyCode, modifiers, nativeScanCode, nativeVirtualKey, nativeModifiers, text, autorepeat, count);
 
-            if (QWindowSystemInterfacePrivate::handleWindowSystemEvent(shortcutOverrideEvent))
-                return false;
-        }
-    }
+    // FIXME: Template handleWindowSystemEvent to support both sync and async delivery
+    QScopedValueRollback<bool> syncRollback(QWindowSystemInterfacePrivate::synchronousWindowSystemEvents, true);
+    return QWindowSystemInterfacePrivate::handleWindowSystemEvent(shortcutOverrideEvent);
+#else
+    Q_UNUSED(window)
+    Q_UNUSED(timestamp)
+    Q_UNUSED(keyCode)
+    Q_UNUSED(modifiers)
+    Q_UNUSED(nativeScanCode)
+    Q_UNUSED(nativeVirtualKey)
+    Q_UNUSED(nativeModifiers)
+    Q_UNUSED(text)
+    Q_UNUSED(autorepeat)
+    Q_UNUSED(count)
+    return false;
+#endif
+}
+
+bool QWindowSystemInterface::handleShortcutEvent(QWindow *window, ulong timestamp, int keyCode, Qt::KeyboardModifiers modifiers, quint32 nativeScanCode,
+                                      quint32 nativeVirtualKey, quint32 nativeModifiers, const QString &text, bool autorepeat, ushort count)
+{
+#ifndef QT_NO_SHORTCUT
+    if (tryShortcutOverride(window, timestamp, keyCode, modifiers, nativeScanCode, nativeVirtualKey, nativeModifiers, text, autorepeat, count))
+        return false;
 
     // The shortcut event is dispatched as a QShortcutEvent, not a QKeyEvent, but we use
     // the QKeyEvent as a container for the various properties that the shortcut map needs
@@ -231,11 +250,11 @@ bool QWindowSystemInterface::handleShortcutEvent(QWindow *window, ulong timestam
     QKeyEvent keyEvent(QEvent::ShortcutOverride, keyCode, modifiers, nativeScanCode,
         nativeVirtualKey, nativeModifiers, text, autorepeat, count);
 
-    return shortcutMap.tryShortcut(&keyEvent);
+    return QGuiApplicationPrivate::instance()->shortcutMap.tryShortcut(&keyEvent);
 #else
     Q_UNUSED(window)
     Q_UNUSED(timestamp)
-    Q_UNUSED(key)
+    Q_UNUSED(keyCode)
     Q_UNUSED(modifiers)
     Q_UNUSED(nativeScanCode)
     Q_UNUSED(nativeVirtualKey)
