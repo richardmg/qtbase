@@ -167,38 +167,33 @@ QT_NAMESPACE_ALIAS_OBJC_CLASS(QCocoaMenuDelegate);
             return YES;
         }
 
-        QObject *object = qApp->focusObject();
-        if (object) {
-            QChar ch;
-            int keyCode;
-            ulong nativeModifiers = [event modifierFlags];
-            Qt::KeyboardModifiers modifiers = [QNSView convertKeyModifiers: nativeModifiers];
-            NSString *charactersIgnoringModifiers = [event charactersIgnoringModifiers];
-            NSString *characters = [event characters];
+        QChar ch;
+        int keyCode;
+        ulong nativeModifiers = [event modifierFlags];
+        Qt::KeyboardModifiers modifiers = [QNSView convertKeyModifiers: nativeModifiers];
+        NSString *charactersIgnoringModifiers = [event charactersIgnoringModifiers];
+        NSString *characters = [event characters];
 
-            if ([charactersIgnoringModifiers length] > 0) { // convert the first character into a key code
-                if ((modifiers & Qt::ControlModifier) && ([characters length] != 0)) {
-                    ch = QChar([characters characterAtIndex:0]);
-                } else {
-                    ch = QChar([charactersIgnoringModifiers characterAtIndex:0]);
-                }
-                keyCode = qt_mac_cocoaKey2QtKey(ch);
+        if ([charactersIgnoringModifiers length] > 0) { // convert the first character into a key code
+            if ((modifiers & Qt::ControlModifier) && ([characters length] != 0)) {
+                ch = QChar([characters characterAtIndex:0]);
             } else {
-                // might be a dead key
-                ch = QChar::ReplacementCharacter;
-                keyCode = Qt::Key_unknown;
+                ch = QChar([charactersIgnoringModifiers characterAtIndex:0]);
             }
+            keyCode = qt_mac_cocoaKey2QtKey(ch);
+        } else {
+            // might be a dead key
+            ch = QChar::ReplacementCharacter;
+            keyCode = Qt::Key_unknown;
+        }
 
-            QKeyEvent accel_ev(QEvent::ShortcutOverride, (keyCode & (~Qt::KeyboardModifierMask)),
-                               Qt::KeyboardModifiers(modifiers & Qt::KeyboardModifierMask));
-            accel_ev.ignore();
-            QCoreApplication::sendEvent(object, &accel_ev);
-            if (accel_ev.isAccepted()) {
-                [[NSApp keyWindow] sendEvent: event];
-                *target = nil;
-                *action = nil;
-                return YES;
-            }
+        if (QWindowSystemInterface::tryShortcutOverride(0, 0,
+            (keyCode & (~Qt::KeyboardModifierMask)),
+            Qt::KeyboardModifiers(modifiers & Qt::KeyboardModifierMask))) {
+            [[NSApp keyWindow] sendEvent: event];
+            *target = nil;
+            *action = nil;
+            return YES;
         }
     }
     return NO;
