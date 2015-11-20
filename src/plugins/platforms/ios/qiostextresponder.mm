@@ -400,16 +400,12 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
             return YES;
         }
 
-        unsigned long time = QWindowSystemInterfacePrivate::eventTime.elapsed();
         const int keys = QKeySequence(standardKey)[0];
         Qt::Key key = Qt::Key(keys & 0x0000FFFF);
         Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
-        QScopedValueRollback<bool> syncRollback(QWindowSystemInterfacePrivate::synchronousWindowSystemEvents, true);
-        QWindowSystemInterfacePrivate::KeyEvent *shortcutOverrideEvent = new QWindowSystemInterfacePrivate::KeyEvent(
-                    qApp->focusWindow(), time, QEvent::ShortcutOverride, key, modifiers, 0, 0, 0, QString(), false, 1);
 
-        if (QWindowSystemInterfacePrivate::handleWindowSystemEvent(shortcutOverrideEvent)) {
-            qDebug() << "found override:" << shortcut;
+        if (QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers)) {
+            qDebug() << "* found override:" << shortcut;
             return YES;
         } else {
             qDebug() << "no override:" << shortcut;
