@@ -375,33 +375,30 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
     // keyboard and the menu item inside the edit menu) if anyone is listening
     // for the corresponding shortcut.
 
+    // todo: don't show edit menu items like copy when no selection
+    // todo: figure out a new way for edit menu items, they can probably not
+    // 		 have shortcuts. Still, the old warning are now gone??
+    // 		 Perhaps we should just remove the standard edit actions manually
+    //	     from the EditMenu_ios, since they will anyway be added when needed.
+    // todo: can we stop edit menu from showing edit actions if QMenu doesn't
+    //		 contain them? Is that working now, since we no longer ask
+    //		 the menu for actions, but only probe shortcuts in Qt?
 
-    // todo: cache for focus object
-    qDebug() << "focus object:" << qApp->focusWindow() << qApp->focusObject();
+    // todo: don't show undo/paste etc while picker menu is showing
+    // todo: cache for focus object? check how often this function is called.
 
     QKeySequence::StandardKey standardKey = standardKeyHash[action];
     if (standardKey == QKeySequence::UnknownKey)
         return [super canPerformAction:action withSender:sender];
 
     QKeySequence shortcut(standardKey);
-
-    if (QGuiApplicationPrivate::instance()->shortcutMap.hasShortcutForKeySequence(shortcut)) {
-        qDebug() << "found shortcut:" << shortcut;
+    if (QGuiApplicationPrivate::instance()->shortcutMap.hasShortcutForKeySequence(shortcut))
         return YES;
-    }
 
     const int keys = QKeySequence(standardKey)[0];
     Qt::Key key = Qt::Key(keys & 0x0000FFFF);
     Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
-
-    if (QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers)) {
-        qDebug() << "* found override:" << shortcut;
-        return YES;
-    } else {
-        qDebug() << "no override:" << shortcut;
-    }
-
-    return NO;
+    return QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers));
 }
 
 - (void)forwardInvocation:(NSInvocation *)invocation
