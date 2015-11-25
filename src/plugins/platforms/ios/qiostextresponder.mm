@@ -381,6 +381,13 @@
     [self sendShortcut:QKeySequence::Paste];
 }
 
+- (void)select:(id)sender
+{
+    Q_UNUSED(sender);
+    [self sendShortcut:QKeySequence::MoveToPreviousWord];
+    [self sendShortcut:QKeySequence::SelectNextWord];
+}
+
 - (void)selectAll:(id)sender
 {
     Q_UNUSED(sender);
