@@ -36,6 +36,7 @@
 #include "qiosglobal.h"
 #include "qiosinputcontext.h"
 #include "quiview.h"
+#include "qiosmenu.h"
 
 #include <QtCore/qscopedvaluerollback.h>
 
@@ -355,75 +356,63 @@
 
 #ifndef QT_NO_SHORTCUT
 
-- (void)sendShortcut:(QKeySequence::StandardKey)standardKey
+static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
+    {@selector(cut:), QKeySequence::Cut},
+    {@selector(copy:), QKeySequence::Copy},
+    {@selector(paste:), QKeySequence::Paste},
+    {@selector(selectAll:), QKeySequence::SelectAll},
+    {@selector(delete:), QKeySequence::Delete},
+    {@selector(toggleBoldface:), QKeySequence::Bold},
+    {@selector(toggleItalics:), QKeySequence::Italic},
+    {@selector(toggleUnderline:), QKeySequence::Underline},
+    {@selector(undo), QKeySequence::Undo},
+    {@selector(redo), QKeySequence::Redo}
+};
+
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender
 {
-    const int keys = QKeySequence(standardKey)[0];
+    // Only enable an edit action if the application is listening for the corresponding shortcut.
+    QKeySequence::StandardKey standardKey = standardKeyHash[action];
+    if (standardKey == QKeySequence::UnknownKey)
+        return [super canPerformAction:action withSender:sender];
+
+    QKeySequence shortcut(standardKey);
+    if (QGuiApplicationPrivate::instance()->shortcutMap.hasShortcutForKeySequence(shortcut))
+        return YES;
+
+    int keys = QKeySequence(standardKey)[0];
+    Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+    return QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers);
+}
+
+- (void)forwardInvocation:(NSInvocation *)invocation
+{
+    // If the invocation is an edit action, send a shortcut key combination to Qt
+    QKeySequence::StandardKey standardKey = standardKeyHash[invocation.selector];
+    if (standardKey == QKeySequence::UnknownKey)
+        return [super forwardInvocation:invocation];
+
+    int keys = QKeySequence(standardKey)[0];
     Qt::Key key = Qt::Key(keys & 0x0000FFFF);
     Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
     [self sendKeyPressRelease:key modifiers:modifiers];
+
+    if (standardKey == QKeySequence::Undo || standardKey == QKeySequence::Redo)
+        [self rebuildUndoStack];
 }
 
-- (void)cut:(id)sender
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)selector
 {
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Cut];
-}
+    if (standardKeyHash[selector] == QKeySequence::UnknownKey)
+        return [super methodSignatureForSelector:selector];
 
-- (void)copy:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Copy];
-}
-
-- (void)paste:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Paste];
-}
-
-- (void)selectAll:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::SelectAll];
-}
-
-- (void)delete:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Delete];
-}
-
-- (void)toggleBoldface:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Bold];
-}
-
-- (void)toggleItalics:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Italic];
-}
-
-- (void)toggleUnderline:(id)sender
-{
-    Q_UNUSED(sender);
-    [self sendShortcut:QKeySequence::Underline];
+    // Just return a dummy signature that NSObject can create an NSInvocation from.
+    // We end up only checking selector in forwardInvocation anyway.
+    return [super methodSignatureForSelector:@selector(methodSignatureForSelector:)];
 }
 
 // -------------------------------------------------------------------------
-
-- (void)undo
-{
-    [self sendShortcut:QKeySequence::Undo];
-    [self rebuildUndoStack];
-}
-
-- (void)redo
-{
-    [self sendShortcut:QKeySequence::Redo];
-    [self rebuildUndoStack];
-}
 
 - (void)registerRedo
 {
@@ -435,6 +424,9 @@
 
 - (void)rebuildUndoStack
 {
+    if (![self canPerformAction:@selector(undo) withSender:self])
+        return;
+
     dispatch_async(dispatch_get_main_queue (), ^{
         // Register dummy undo/redo operations to enable Cmd-Z and Cmd-Shift-Z
         // Ensure we do this outside any undo/redo callback since NSUndoManager
