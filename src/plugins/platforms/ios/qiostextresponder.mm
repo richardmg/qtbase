@@ -494,6 +494,9 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
 
 - (void)rebuildUndoStack
 {
+    if (![self canPerformAction:@selector(undo) withSender:self])
+        return;
+
     dispatch_async(dispatch_get_main_queue (), ^{
         // Register dummy undo/redo operations to enable Cmd-Z and Cmd-Shift-Z
         // Ensure we do this outside any undo/redo callback since NSUndoManager
