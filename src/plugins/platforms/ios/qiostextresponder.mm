@@ -355,12 +355,64 @@
 
 #ifndef QT_NO_SHORTCUT
 
+static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
+    {@selector(select:), QKeySequence::SelectPreviousWord},
+    {@selector(selectAll:), QKeySequence::SelectAll},
+    {@selector(cut:), QKeySequence::Cut},
+    {@selector(copy:), QKeySequence::Copy},
+    {@selector(paste:), QKeySequence::Paste},
+    {@selector(delete:), QKeySequence::Delete},
+    {@selector(toggleBoldface:), QKeySequence::Bold},
+    {@selector(toggleItalics:), QKeySequence::Italic},
+    {@selector(toggleUnderline:), QKeySequence::Underline},
+    {@selector(undo), QKeySequence::Undo},
+    {@selector(redo), QKeySequence::Redo}
+};
+
 - (void)sendShortcut:(QKeySequence::StandardKey)standardKey
 {
     const int keys = QKeySequence(standardKey)[0];
     Qt::Key key = Qt::Key(keys & 0x0000FFFF);
     Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
     [self sendKeyPressRelease:key modifiers:modifiers];
+}
+
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender
+{
+    QKeySequence::StandardKey key = standardKeyHash[action];
+    if (key == QKeySequence::UnknownKey)
+        return [super canPerformAction:action withSender:sender];
+
+    // Filter keys depending on edit state
+    if ([self selectedTextRange].empty) {
+        switch (key) {
+        case QKeySequence::Paste:
+        case QKeySequence::SelectPreviousWord:
+        case QKeySequence::SelectAll:
+        case QKeySequence::Undo:
+        case QKeySequence::Redo:
+            break;
+        default:
+            return NO;
+        }
+    } else {
+        switch (key) {
+        case QKeySequence::Cut:
+        case QKeySequence::Copy:
+        case QKeySequence::Paste:
+        case QKeySequence::Delete:
+        case QKeySequence::Bold:
+        case QKeySequence::Italic:
+        case QKeySequence::Underline:
+        case QKeySequence::Undo:
+        case QKeySequence::Redo:
+            break;
+        default:
+            return NO;
+         }
+    }
+
+    return YES;
 }
 
 - (void)cut:(id)sender
