@@ -356,6 +356,55 @@
 
 #ifndef QT_NO_SHORTCUT
 
+static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
+    {@selector(select:), QKeySequence::SelectNextWord},
+    {@selector(selectAll:), QKeySequence::SelectAll},
+    {@selector(cut:), QKeySequence::Cut},
+    {@selector(copy:), QKeySequence::Copy},
+    {@selector(paste:), QKeySequence::Paste},
+    {@selector(delete:), QKeySequence::Delete},
+    {@selector(toggleBoldface:), QKeySequence::Bold},
+    {@selector(toggleItalics:), QKeySequence::Italic},
+    {@selector(toggleUnderline:), QKeySequence::Underline},
+    {@selector(undo), QKeySequence::Undo},
+    {@selector(redo), QKeySequence::Redo}
+};
+
+- (BOOL)actionSupportedInCurrentEditingState:(QKeySequence::StandardKey)standardKey
+{
+    const bool hasSelection = ![self selectedTextRange].empty;
+
+    if (hasSelection) {
+        switch (standardKey) {
+        case QKeySequence::Cut:
+        case QKeySequence::Copy:
+        case QKeySequence::Paste:
+        case QKeySequence::Delete:
+        case QKeySequence::Bold:
+        case QKeySequence::Italic:
+        case QKeySequence::Underline:
+        case QKeySequence::Undo:
+        case QKeySequence::Redo:
+            return YES;
+        default:
+            break;
+        }
+    } else {
+        switch (standardKey) {
+        case QKeySequence::SelectNextWord:
+        case QKeySequence::SelectAll:
+        case QKeySequence::Paste:
+        case QKeySequence::Undo:
+        case QKeySequence::Redo:
+            return YES;
+        default:
+            break;
+        }
+    }
+
+    return NO;
+}
+
 - (void)sendShortcut:(QKeySequence::StandardKey)standardKey
 {
     const int keys = QKeySequence(standardKey)[0];
@@ -366,28 +415,21 @@
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender
 {
-    bool isEditAction = (action == @selector(cut:)
-        || action == @selector(copy:)
-        || action == @selector(paste:)
-        || action == @selector(delete:)
-        || action == @selector(toggleBoldface:)
-        || action == @selector(toggleItalics:)
-        || action == @selector(toggleUnderline:)
-        || action == @selector(undo)
-        || action == @selector(redo));
+    QKeySequence::StandardKey standardKey = standardKeyHash[action];
 
-    bool isSelectAction = (action == @selector(select:)
-        || action == @selector(selectAll:)
-        || action == @selector(paste:)
-        || action == @selector(undo)
-        || action == @selector(redo));
-
-    const bool unknownAction = !isEditAction && !isSelectAction;
-    const bool hasSelection = ![self selectedTextRange].empty;
-
-    if (unknownAction)
+    if (standardKey == QKeySequence::UnknownKey)
         return [super canPerformAction:action withSender:sender];
-    return (hasSelection && isEditAction) || (!hasSelection && isSelectAction);
+
+    if (![self actionSupportedInCurrentEditingState:standardKey])
+        return NO;
+
+    // Send a shortcut override event to see if the focus object supports the action. Note that we
+    // could have checked the shortcutmap as well, but we want to avoid triggering non IM-related
+    // shortcuts that does something different than what the action is supposed to do.
+    int keys = QKeySequence(standardKey)[0];
+    Qt::Key key = Qt::Key(keys & 0x0000FFFF);
+    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(keys & 0xFFFF0000);
+    return QWindowSystemInterface::tryShortcutOverride(0, 0, key, modifiers);
 }
 
 - (void)cut:(id)sender
