@@ -378,7 +378,6 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
         switch (standardKey) {
         case QKeySequence::Cut:
         case QKeySequence::Copy:
-        case QKeySequence::Paste:
         case QKeySequence::Delete:
         case QKeySequence::Bold:
         case QKeySequence::Italic:
@@ -386,6 +385,9 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
         case QKeySequence::Undo:
         case QKeySequence::Redo:
             return YES;
+        case QKeySequence::Paste:
+            if ([UIPasteboard generalPasteboard].numberOfItems > 0)
+                return YES;
         default:
             break;
         }
@@ -393,10 +395,13 @@ static const QHash<SEL, QKeySequence::StandardKey> standardKeyHash = {
         switch (standardKey) {
         case QKeySequence::SelectNextWord:
         case QKeySequence::SelectAll:
-        case QKeySequence::Paste:
         case QKeySequence::Undo:
         case QKeySequence::Redo:
             return YES;
+        case QKeySequence::Paste:
+            qDebug() << [UIPasteboard generalPasteboard].numberOfItems;
+            if ([UIPasteboard generalPasteboard].numberOfItems > 0)
+                return YES;
         default:
             break;
         }
