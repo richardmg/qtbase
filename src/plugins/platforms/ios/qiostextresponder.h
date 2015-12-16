@@ -46,6 +46,7 @@ class QIOSInputContext;
     QString m_markedText;
     BOOL m_inSendEventToFocusObject;
     BOOL m_inSelectionChange;
+    UITextView *m_UITextView;
 }
 
 - (id)initWithInputContext:(QIOSInputContext *)context;

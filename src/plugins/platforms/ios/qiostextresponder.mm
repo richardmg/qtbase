@@ -31,6 +31,8 @@
 **
 ****************************************************************************/
 
+#import <UIKit/UIGestureRecognizerSubclass.h>
+
 #include "qiostextresponder.h"
 
 #include "qiosglobal.h"
@@ -155,6 +157,126 @@
 
 // -------------------------------------------------------------------------
 
+@interface TransparentUITextViewTouchListener : UIGestureRecognizer <UIGestureRecognizerDelegate> {
+@public
+    UITextView *_textView;
+}
+@end
+
+@implementation TransparentUITextViewTouchListener
+
+- (id)initWithUITextView:(UITextView *)textView
+{
+    if (self = [super initWithTarget:self action:@selector(gestureTriggered:)]) {
+        _textView = textView;
+        self.enabled = YES;
+        self.cancelsTouchesInView = NO;
+        self.delaysTouchesEnded = NO;
+    }
+
+    return self;
+}
+
+- (BOOL)canPreventGestureRecognizer:(UIGestureRecognizer *)other
+{
+    Q_UNUSED(other);
+    return NO;
+}
+
+- (BOOL)canBePreventedByGestureRecognizer:(UIGestureRecognizer *)other
+{
+    Q_UNUSED(other);
+    return NO;
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    [super touchesBegan:touches withEvent:event];
+    _textView.text = @"press";
+    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+    [view touchesBegan:touches withEvent:event];
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    [super touchesMoved:touches withEvent:event];
+    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+    [view touchesMoved:touches withEvent:event];
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    [super touchesEnded:touches withEvent:event];
+    _textView.text = @"release";
+    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+    [view touchesEnded:touches withEvent:event];
+}
+
+- (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
+{
+    [super touchesCancelled:touches withEvent:event];
+    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+    [view touchesCancelled:touches withEvent:event];
+}
+
+- (void)gestureTriggered:(id)sender
+{
+    Q_UNUSED(sender);
+}
+
+@end
+
+// -------------------------------------------------------------------------
+
+@interface TransparentUITextView : UITextView {
+    QIOSTextInputResponder *_textResponder;
+    TransparentUITextViewTouchListener *_touchListener;
+}
+@end
+
+@implementation TransparentUITextView
+
+-(id)initWithTextResponder:(QIOSTextInputResponder *)textResponder
+{
+    CGRect frame = toCGRect(QGuiApplication::inputMethod()->editRectangle());
+    if (self = [super initWithFrame:(CGRect)frame textContainer:nil]) {
+        _textResponder = textResponder;
+        UIColor *transparent = [UIColor colorWithWhite:0.0 alpha:0.0];
+        self.backgroundColor = transparent;
+        self.tintColor = transparent;
+        self.textColor = transparent;
+    }
+    return self;
+}
+
+-(void)setAsOverlay:(BOOL)overlay
+{
+    if (overlay) {
+        _touchListener = [[TransparentUITextViewTouchListener alloc] initWithUITextView:self];
+        [self addGestureRecognizer:_touchListener];
+        UIView *targetView = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+        [targetView addSubview:self];
+    } else {
+        _touchListener->_textView = nil; // fix me
+        [self removeGestureRecognizer:_touchListener];
+        [self removeFromSuperview];
+    }
+}
+
+- (BOOL)canBecomeFirstResponder
+{
+    return NO;
+}
+
+- (BOOL)isFirstResponder
+{
+    return YES;
+}
+
+@end
+
+// -------------------------------------------------------------------------
+
 @implementation QIOSTextInputResponder
 
 - (id)initWithInputContext:(QIOSInputContext *)inputContext
@@ -165,6 +287,7 @@
     m_inSendEventToFocusObject = NO;
     m_inSelectionChange = NO;
     m_inputContext = inputContext;
+    m_UITextView = nil;
 
     m_configuredImeState = new QInputMethodQueryEvent(m_inputContext->imeState().currentState);
     QVariantMap platformData = m_configuredImeState->value(Qt::ImPlatformData).toMap();
@@ -260,7 +383,7 @@
     }
 
     // Based on what we set up in initWithInputContext above
-    updatedProperties &= (Qt::ImHints | Qt::ImEnterKeyType | Qt::ImPlatformData);
+    updatedProperties &= (Qt::ImHints | Qt::ImEnterKeyType | Qt::ImPlatformData | Qt::ImEditRectangle);
 
     if (!updatedProperties)
         return NO;
@@ -295,11 +418,18 @@
 
     qImDebug() << self << "became first responder";
 
+    m_UITextView = [[TransparentUITextView alloc] initWithTextResponder:self];
+    [static_cast<TransparentUITextView *>(m_UITextView) setAsOverlay:YES];
+
     return YES;
 }
 
 - (BOOL)resignFirstResponder
 {
+    [static_cast<TransparentUITextView *>(m_UITextView) setAsOverlay:NO];
+    [m_UITextView release];
+    m_UITextView = nil;
+
     qImDebug() << "self:" << self << "first:" << [UIResponder currentFirstResponder];
 
     // Don't allow activation events of the window that we're doing text on behalf on
