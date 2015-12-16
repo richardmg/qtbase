@@ -96,7 +96,7 @@ void QInputMethod::setInputItemTransform(const QTransform &transform)
         return;
 
     d->inputItemTransform = transform;
-    emit cursorRectangleChanged();
+    update(Qt::ImCursorRectangle | Qt::ImEditRectangle);
 }
 
 
@@ -144,6 +144,23 @@ QRectF QInputMethod::cursorRectangle() const
     QInputMethodQueryEvent query(Qt::ImCursorRectangle);
     QGuiApplication::sendEvent(focusObject, &query);
     QRectF r = query.value(Qt::ImCursorRectangle).toRectF();
+    if (!r.isValid())
+        return QRectF();
+
+    return d->inputItemTransform.mapRect(r);
+}
+
+QRectF QInputMethod::editRectangle() const
+{
+    Q_D(const QInputMethod);
+
+    QObject *focusObject = qGuiApp->focusObject();
+    if (!focusObject)
+        return QRectF();
+
+    QInputMethodQueryEvent query(Qt::ImEditRectangle);
+    QGuiApplication::sendEvent(focusObject, &query);
+    QRectF r = query.value(Qt::ImEditRectangle).toRectF();
     if (!r.isValid())
         return QRectF();
 
@@ -300,6 +317,8 @@ void QInputMethod::update(Qt::InputMethodQueries queries)
 
     if (queries & Qt::ImCursorRectangle)
         emit cursorRectangleChanged();
+    if (queries & Qt::ImEditRectangle)
+        emit editRectangleChanged();
 }
 
 /*!

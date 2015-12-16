@@ -74,6 +74,9 @@ public:
     // keyboard geometry in window coords
     QRectF keyboardRectangle() const;
 
+    // focus object geometry in window coords
+    QRectF editRectangle() const;
+
     enum Action {
         Click,
         ContextMenu
@@ -103,6 +106,7 @@ public Q_SLOTS:
 Q_SIGNALS:
     void cursorRectangleChanged();
     void keyboardRectangleChanged();
+    void editRectangleChanged();
     void visibleChanged();
     void animatingChanged();
     void localeChanged();
