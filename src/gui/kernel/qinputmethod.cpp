@@ -144,6 +144,23 @@ QRectF QInputMethod::cursorRectangle() const
     return d->inputItemTransform.mapRect(r);
 }
 
+QRectF QInputMethod::editRectangle() const
+{
+    Q_D(const QInputMethod);
+
+    QObject *focusObject = qGuiApp->focusObject();
+    if (!focusObject)
+        return QRectF();
+
+    QInputMethodQueryEvent query(Qt::ImEditRectangle);
+    QGuiApplication::sendEvent(focusObject, &query);
+    QRectF r = query.value(Qt::ImEditRectangle).toRectF();
+    if (!r.isValid())
+        return QRectF();
+
+    return d->inputItemTransform.mapRect(r);
+}
+
 /*!
     \property QInputMethod::keyboardRectangle
     \brief Virtual keyboard's geometry in window coordinates.
