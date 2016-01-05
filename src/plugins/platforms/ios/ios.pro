@@ -28,6 +28,7 @@ OBJECTIVE_SOURCES = \
     quiaccessibilityelement.mm \
     qiosplatformaccessibility.mm \
     qiostextresponder.mm \
+    qiostexteditoverlay.mm \
     qiosmenu.mm \
     qiosfileengineassetslibrary.mm \
     qiosfiledialog.mm \
@@ -52,6 +53,7 @@ HEADERS = \
     quiaccessibilityelement.h \
     qiosplatformaccessibility.h \
     qiostextresponder.h \
+    qiostexteditoverlay.h \
     qiosmenu.h \
     qiosfileenginefactory.h \
     qiosfileengineassetslibrary.h \
