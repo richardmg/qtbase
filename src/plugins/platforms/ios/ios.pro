@@ -31,7 +31,8 @@ OBJECTIVE_SOURCES = \
     qiosmenu.mm \
     qiosfileengineassetslibrary.mm \
     qiosfiledialog.mm \
-    qiosmessagedialog.mm
+    qiosmessagedialog.mm \
+    qiostextinputoverlay.mm
 
 HEADERS = \
     qiosintegration.h \
@@ -56,7 +57,8 @@ HEADERS = \
     qiosfileenginefactory.h \
     qiosfileengineassetslibrary.h \
     qiosfiledialog.h \
-    qiosmessagedialog.h
+    qiosmessagedialog.h \
+    qiostextinputoverlay.h
 
 OTHER_FILES = \
     quiview_textinput.mm \

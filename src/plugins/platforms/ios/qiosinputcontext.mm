@@ -48,6 +48,7 @@
 #include "qiosviewcontroller.h"
 #include "qioswindow.h"
 #include "quiview.h"
+#include "qiostextinputoverlay.h"
 
 #include <QGuiApplication>
 #include <QtGui/private/qwindow_p.h>
@@ -584,6 +585,8 @@ void QIOSInputContext::focusWindowChanged(QWindow *focusWindow)
 */
 void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
 {
+    QIOSTextInputOverlay::update(updatedProperties);
+
     // Mask for properties that we are interested in and see if any of them changed
     updatedProperties &= (Qt::ImEnabled | Qt::ImHints | Qt::ImQueryInput | Qt::ImEnterKeyType | Qt::ImPlatformData);
 
