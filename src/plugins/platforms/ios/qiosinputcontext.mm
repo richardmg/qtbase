@@ -229,7 +229,7 @@ static QUIView *focusView()
     if (self.state == UIGestureRecognizerStateBegan) {
         qImDebug() << "hide keyboard gesture was triggered";
         UIResponder *firstResponder = [UIResponder currentFirstResponder];
-        Q_ASSERT([firstResponder isKindOfClass:[QIOSTextInputResponder class]]);
+        //Q_ASSERT([firstResponder isKindOfClass:[QIOSTextInputResponder class]]);
         [firstResponder resignFirstResponder];
     }
 }
@@ -329,7 +329,8 @@ void QIOSInputContext::hideInputPanel()
     }
 
     qImDebug() << "hiding VKB as requested by QInputMethod::hide()";
-    [m_textResponder resignFirstResponder];
+    UIResponder *firstResponder = [UIResponder currentFirstResponder];
+    [firstResponder resignFirstResponder];
 }
 
 void QIOSInputContext::clearCurrentFocusObject()
@@ -611,7 +612,8 @@ void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
             scrollToCursor();
     } else if ([m_textResponder isFirstResponder]) {
         qImDebug() << "IM not enabled, resigning text responder as first responder";
-        [m_textResponder resignFirstResponder];
+        UIResponder *firstResponder = [UIResponder currentFirstResponder];
+        [firstResponder resignFirstResponder];
     }
 }
 
