@@ -48,6 +48,7 @@
 #include "qiosviewcontroller.h"
 #include "qioswindow.h"
 #include "quiview.h"
+#include "qiostextinputoverlay.h"
 
 #include <QGuiApplication>
 #include <QtGui/private/qwindow_p.h>
