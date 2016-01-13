@@ -602,7 +602,7 @@ void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
             [m_textResponder notifyInputDelegate:changedProperties];
         }
 
-        if (![m_textResponder isFirstResponder]) {
+        if (![m_textResponder isFirstResponder] && m_keyboardHideGesture.state != UIGestureRecognizerStateBegan) {
             qImDebug() << "IM enabled, making text responder first responder";
             [m_textResponder becomeFirstResponder];
         }
