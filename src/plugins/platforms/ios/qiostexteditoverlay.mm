@@ -108,6 +108,8 @@
     UIView *_targetView;
     QIOSLoupe *_loupeView;
     CGRect _editRect;
+    CGPoint _lastTouchPoint;
+    QTimer _triggerLoupeTimer;
 }
 @end
 
@@ -115,12 +117,18 @@
 
 - (id)init
 {
-    if (self = [super initWithTarget:self action:@selector(gestureStateChanged:)]) {
+    if (self = [super initWithTarget:self action:@selector(gestureStateChanged)]) {
         _targetView = nil;
         _loupeView = nil;
         self.enabled = YES;
-        self.cancelsTouchesInView = NO;
+        self.cancelsTouchesInView = YES;
         self.delaysTouchesEnded = NO;
+
+        _triggerLoupeTimer.setInterval(500);
+        _triggerLoupeTimer.setSingleShot(true);
+        QObject::connect(&_triggerLoupeTimer, &QTimer::timeout, [=](){
+            self.state = UIGestureRecognizerStateBegan;
+        });
     }
 
     return self;
@@ -128,26 +136,37 @@
 
 - (void)dealloc
 {
+    _triggerLoupeTimer.stop();
     [_targetView removeGestureRecognizer:self];
     if (_loupeView)
         [self removeLoupeView];
     [super dealloc];
 }
 
-- (void)createLoupeView
+- (void)gestureStateChanged
 {
-    Q_ASSERT(!_loupeView);
-    _loupeView = [[QIOSLoupe alloc] initWithTargetView:_targetView];
-    [[UIApplication sharedApplication].keyWindow addSubview:_loupeView];
-}
+    switch (self.state) {
+    case UIGestureRecognizerStateBegan:
+        [self createLoupeView];
+        _loupeView.focalPoint = _lastTouchPoint;
+        break;
+    case UIGestureRecognizerStateChanged:
+        _loupeView.focalPoint = _lastTouchPoint;
+        break;
+    default:
+        [self removeLoupeView];
+        break;
+    }
 
-- (void)removeLoupeView
-{
-    [_loupeView removeFromSuperview];
-    [_loupeView release];
-    _loupeView = nil;
-}
+        // Trenger her å finne text posisjon for touch pos!!!!!!
+        // Kanskje faktorere ut dette i en egen delegate?
 
+        //    QList<QInputMethodEvent::Attribute> attrs;
+        //    attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 10, 0, 0);
+        //    QInputMethodEvent e(QString(), attrs);
+        //    QCoreApplication::sendEvent(QGuiApplication::focusObject(), &e);
+
+}
 - (void)update:(const Qt::InputMethodQueries &)updatedProperties
 {
     UIView *focusView = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
@@ -161,68 +180,63 @@
         _editRect = toCGRect(QGuiApplication::inputMethod()->editRectangle());
 }
 
-- (void)gestureStateChanged:(id)sender
+- (void)createLoupeView
 {
-    Q_UNUSED(sender);
+    _loupeView = [[QIOSLoupe alloc] initWithTargetView:_targetView];
+    [[UIApplication sharedApplication].keyWindow addSubview:_loupeView];
 }
 
-- (BOOL)canPreventGestureRecognizer:(UIGestureRecognizer *)other
+- (void)removeLoupeView
 {
-    Q_UNUSED(other);
-    return NO;
+    [_loupeView removeFromSuperview];
+    [_loupeView release];
+    _loupeView = nil;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    // Forward all touch events to the QWindow that has focus (by sending them through the backing
-    // QUIView). We need to do this using a gesture recognizer (as opposed to method overriding) since
-    // other attached recognizers (e.g UITapGestureRecognizer) will send touch cancel to UITextView
-    // to control local behavior. This
-    // in turn would make touch forwarding to Qt break, if done that way.
     [super touchesBegan:touches withEvent:event];
-    self.state = UIGestureRecognizerStateBegan;
+    _lastTouchPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
 
-    if ([event allTouches].count == 1) {
-        [self createLoupeView];
-        _loupeView.focalPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+    if ([event allTouches].count > 1) {
+        _triggerLoupeTimer.stop();
+        self.state = UIGestureRecognizerStateFailed;
     } else {
-        [self removeLoupeView];
+        // if inside edit rect, then:
+        _triggerLoupeTimer.start();
     }
-
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesMoved:touches withEvent:event];
-
-    _loupeView.focalPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
-
-        // Trenger her å finne text posisjon for touch pos!!!!!!
-        // Kanskje faktorere ut dette i en egen delegate?
-
-        //    QList<QInputMethodEvent::Attribute> attrs;
-        //    attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 10, 0, 0);
-        //    QInputMethodEvent e(QString(), attrs);
-        //    QCoreApplication::sendEvent(QGuiApplication::focusObject(), &e);
+    if (self.state == UIGestureRecognizerStatePossible) {
+        CGPoint p = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+        CGFloat dist = hypot(_lastTouchPoint.x - p.x, _lastTouchPoint.y - p.y);
+        if (dist > 10) {
+            _triggerLoupeTimer.stop();
+            self.state = UIGestureRecognizerStateFailed;
+        }
+    } else {
+        _lastTouchPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+        self.state = UIGestureRecognizerStateChanged;
+    }
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesEnded:touches withEvent:event];
-    self.state = UIGestureRecognizerStateFailed;
-    [self removeLoupeView];
+    _lastTouchPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+    _triggerLoupeTimer.stop();
+    self.state = UIGestureRecognizerStateEnded;
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesCancelled:touches withEvent:event];
-    self.state = UIGestureRecognizerStateFailed;
-    [self removeLoupeView];
-}
-
-- (void)gestureTriggered:(id)sender
-{
-    Q_UNUSED(sender);
+    _lastTouchPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+    _triggerLoupeTimer.stop();
+    self.state = UIGestureRecognizerStateCancelled;
 }
 
 @end
