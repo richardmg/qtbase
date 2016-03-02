@@ -41,28 +41,83 @@
 #include "qiostexteditoverlay.h"
 #include "qiosinputcontext.h"
 
-@interface TransparentUITextView : UITextView {
-@public
-    BOOL _pretendToBeFirstResponder;
+@interface QIOSLoupe : UIView {
+    UIView *_targetView;
+    UIView *_snapshotView;
 }
+@property (nonatomic, assign) CGPoint focalPoint;
 @end
 
-@interface TextViewTouchListener : UIGestureRecognizer <UIGestureRecognizerDelegate> {
-    TransparentUITextView *_targetView;
-    BOOL _loupeShowing;
-    UIEvent *_fakeTouchesCancelledEvent;
+@implementation QIOSLoupe
+
+- (id)initWithTargetView:(UIView *)targetView
+{
+    if (self = [self initWithFrame:CGRectMake(0, 0, 128, 128)]) {
+        _targetView = [targetView retain];
+        _snapshotView = nil;
+
+        self.layer.borderColor = [[UIColor lightGrayColor] CGColor];
+        self.layer.borderWidth = 1;
+        self.layer.cornerRadius = self.frame.size.width / 2;
+        self.layer.masksToBounds = YES;
+    }
+
+    return self;
 }
+
+- (void)dealloc
+{
+    [_targetView release];
+    [super dealloc];
+}
+
+- (void)setFocalPoint:(CGPoint)point
+{
+    _focalPoint = point;
+    const CGFloat yOffset = 10 + (self.frame.size.height / 2);
+    [super setCenter:CGPointMake(_focalPoint.x, _focalPoint.y - yOffset)];
+    [self setNeedsDisplay];
+}
+
+- (void)drawRect:(CGRect)rect
+{
+    Q_UNUSED(rect)
+
+    if (!QGuiApplication::focusWindow())
+        return;
+
+    UIView *newSnapshotView = [_targetView snapshotViewAfterScreenUpdates:NO];
+
+    const CGFloat loupeScale = 1.5;
+    CGFloat x = -(_focalPoint.x * loupeScale) + self.frame.size.width / 2;
+    CGFloat y = -(_focalPoint.y * loupeScale) + self.frame.size.height / 2;
+    CGFloat w = newSnapshotView.frame.size.width * loupeScale;
+    CGFloat h = newSnapshotView.frame.size.height * loupeScale;
+
+    newSnapshotView.frame = CGRectMake(x, y, w, h);
+    [self addSubview:newSnapshotView];
+    [_snapshotView removeFromSuperview];
+    _snapshotView = newSnapshotView;
+}
+
 @end
 
 // -------------------------------------------------------------------------
 
-@implementation TextViewTouchListener
+@interface QIOSLoupeRecognizer : UIGestureRecognizer <UIGestureRecognizerDelegate> {
+    UIView *_targetView;
+    QIOSLoupe *_loupeView;
+    CGRect _editRect;
+}
+@end
+
+@implementation QIOSLoupeRecognizer
 
 - (id)init
 {
     if (self = [super initWithTarget:self action:@selector(gestureStateChanged:)]) {
-        _loupeShowing = NO;
-        _fakeTouchesCancelledEvent = nil;
+        _targetView = nil;
+        _loupeView = nil;
         self.enabled = YES;
         self.cancelsTouchesInView = NO;
         self.delaysTouchesEnded = NO;
@@ -71,55 +126,39 @@
     return self;
 }
 
--(BOOL)setTargetView:(TransparentUITextView *)targetView
-{
-    _targetView = targetView;
-    [_targetView addGestureRecognizer:self];
-
-    // todo: reverse the check to avoid using string....
-    // todo: can I achive this by using the canPrevent functions?
-    // todo: should this function go into init?
-
-    for (UIGestureRecognizer *gr in _targetView.gestureRecognizers) {
-        if ([NSStringFromClass(gr.class) isEqualToString:@"UIVariableDelayLoupeGesture"]) {
-            qDebug() << "Found loupe!";
-            [gr addTarget:self action:@selector(loupeStateChanged:)];
-            return YES;
-        }
-    }
-    return NO;
-}
-
 - (void)dealloc
 {
-    [_fakeTouchesCancelledEvent release];
+    [_targetView removeGestureRecognizer:self];
+    if (_loupeView)
+        [self removeLoupeView];
     [super dealloc];
 }
 
-- (void)loupeStateChanged:(id)sender
+- (void)createLoupeView
 {
-    switch (static_cast<UIGestureRecognizer *>(sender).state) {
-    case UIGestureRecognizerStateBegan:
-        // Convert the last touch event into a touch cancel event that we send
-        // to QUIView.
-        _loupeShowing = YES;
-        if (_fakeTouchesCancelledEvent) {
-            UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-            [view touchesCancelled:[_fakeTouchesCancelledEvent allTouches] withEvent:_fakeTouchesCancelledEvent];
-            [_fakeTouchesCancelledEvent release];
-            _fakeTouchesCancelledEvent = nil;
-        }
-        break;
-    case UIGestureRecognizerStateEnded:
-    case UIGestureRecognizerStateCancelled:
-    case UIGestureRecognizerStateFailed:
-        // When the magnifier is done, we no longer need to
-        // pretend that TransparentUITextView is first responder.
-        _targetView->_pretendToBeFirstResponder = NO;
-        break;
-    default:
-        break;
+    Q_ASSERT(!_loupeView);
+    _loupeView = [[QIOSLoupe alloc] initWithTargetView:_targetView];
+    [[UIApplication sharedApplication].keyWindow addSubview:_loupeView];
+}
+
+- (void)removeLoupeView
+{
+    [_loupeView removeFromSuperview];
+    [_loupeView release];
+    _loupeView = nil;
+}
+
+- (void)update:(const Qt::InputMethodQueries &)updatedProperties
+{
+    UIView *focusView = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
+    if (_targetView != focusView) {
+        [_targetView removeGestureRecognizer:self];
+        [focusView addGestureRecognizer:self];
+        _targetView = focusView;
     }
+
+    if (updatedProperties & Qt::ImEditRectangle)
+        _editRect = toCGRect(QGuiApplication::inputMethod()->editRectangle());
 }
 
 - (void)gestureStateChanged:(id)sender
@@ -141,27 +180,23 @@
     // to control local behavior. This
     // in turn would make touch forwarding to Qt break, if done that way.
     [super touchesBegan:touches withEvent:event];
-
-    _loupeShowing = NO;
     self.state = UIGestureRecognizerStateBegan;
-    [_fakeTouchesCancelledEvent release];
-    _fakeTouchesCancelledEvent = [event retain];
-    _targetView->_pretendToBeFirstResponder = YES;
 
-    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-    [view touchesBegan:touches withEvent:event];
+    if ([event allTouches].count == 1) {
+        [self createLoupeView];
+        _loupeView.focalPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+    } else {
+        [self removeLoupeView];
+    }
+
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesMoved:touches withEvent:event];
 
-    if (!_loupeShowing) {
-        [_fakeTouchesCancelledEvent release];
-        _fakeTouchesCancelledEvent = [event retain];
-        UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-        [view touchesMoved:touches withEvent:event];
-    } else {
+    _loupeView.focalPoint = [static_cast<UITouch *>([touches anyObject]) locationInView:_targetView];
+
         // Trenger her å finne text posisjon for touch pos!!!!!!
         // Kanskje faktorere ut dette i en egen delegate?
 
@@ -169,31 +204,20 @@
         //    attrs << QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 10, 0, 0);
         //    QInputMethodEvent e(QString(), attrs);
         //    QCoreApplication::sendEvent(QGuiApplication::focusObject(), &e);
-    }
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesEnded:touches withEvent:event];
-    if (_loupeShowing)
-        return;
-
     self.state = UIGestureRecognizerStateFailed;
-    _fakeTouchesCancelledEvent = [event retain];
-    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-    [view touchesEnded:touches withEvent:event];
-    _targetView->_pretendToBeFirstResponder = NO;
+    [self removeLoupeView];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
 {
     [super touchesCancelled:touches withEvent:event];
-    if (_loupeShowing)
-        return;
-
     self.state = UIGestureRecognizerStateFailed;
-    UIView *view = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-    [view touchesCancelled:touches withEvent:event];
+    [self removeLoupeView];
 }
 
 - (void)gestureTriggered:(id)sender
@@ -205,89 +229,11 @@
 
 // -------------------------------------------------------------------------
 
-@implementation TransparentUITextView
-
--(id)initWithFrame:(CGRect)frame
-{
-    if (self = [super initWithFrame:frame textContainer:nil]) {
-        _pretendToBeFirstResponder = NO;
-        self.backgroundColor = [UIColor clearColor];
-        self.tintColor = [UIColor clearColor];
-        self.textColor = [UIColor clearColor];
-    }
-    return self;
-}
-
-- (BOOL)canBecomeFirstResponder
-{
-    // Text input should go to QIOSTextResponder, so we
-    // refuse to become first responder.
-    return NO;
-}
-
-- (BOOL)isFirstResponder
-{
-    // We need to lie and say that we're first responder
-    // for the magnifier to show. This is a fragile part of
-    // the implementation in case someone calls this method
-    // for other purposes than showing the magnifier. To limit
-    // that possibility, we return yes only while the user has a
-    // touch press on the text view, or the magnifier is already
-    // showing. We catch both cases from TextViewTouchListener.
-    return _pretendToBeFirstResponder;
-}
-
-- (BOOL)becomeFirstResponder
-{
-    return NO;
-}
-
-- (BOOL)resignFirstResponder
-{
-    return YES;
-}
-
-@end
-
 // -------------------------------------------------------------------------
 
 QT_BEGIN_NAMESPACE
 
-TransparentUITextView *QIOSTextEditOverlay::s_textView = Q_NULLPTR;
-TextViewTouchListener *QIOSTextEditOverlay::s_gestureRecognizer = Q_NULLPTR;
-
-void QIOSTextEditOverlay::createOverlay()
-{
-    if (s_textView)
-        return;
-
-    CGRect frame = toCGRect(QGuiApplication::inputMethod()->editRectangle());
-    s_textView = [[TransparentUITextView alloc] initWithFrame:frame];
-    s_gestureRecognizer = [TextViewTouchListener new];
-
-    if (![s_gestureRecognizer setTargetView:s_textView]) {
-        qWarning() << "Could not attach QIOSTextEditOverlay";
-        deleteOverlay();
-        return;
-    }
-
-    UIView *targetView = reinterpret_cast<UIView *>(QGuiApplication::focusWindow()->winId());
-    [targetView addSubview:s_textView];
-}
-
-void QIOSTextEditOverlay::deleteOverlay()
-{
-    if (!s_textView)
-        return;
-
-    [s_textView removeGestureRecognizer:s_gestureRecognizer];
-    [s_gestureRecognizer release];
-    s_gestureRecognizer = nil;
-
-    [s_textView removeFromSuperview];
-    [s_textView release];
-    s_textView = nil;
-}
+QIOSLoupeRecognizer *QIOSTextEditOverlay::s_loupeRecognizer = Q_NULLPTR;
 
 void QIOSTextEditOverlay::update(const Qt::InputMethodQueries &updatedProperties)
 {
@@ -299,13 +245,9 @@ void QIOSTextEditOverlay::update(const Qt::InputMethodQueries &updatedProperties
     QCoreApplication::sendEvent(focusObject, &queryEvent);
     bool imEnabled = queryEvent.value(Qt::ImEnabled).toBool();
 
-    if (imEnabled) {
-        createOverlay();
-        if (updatedProperties & Qt::ImEditRectangle)
-            s_textView.frame = toCGRect(QGuiApplication::inputMethod()->editRectangle());
-    } else {
-        deleteOverlay();
-    }
+    if (imEnabled && !s_loupeRecognizer)
+        s_loupeRecognizer = [QIOSLoupeRecognizer new];
+    [s_loupeRecognizer update:updatedProperties];
 }
 
 QT_END_NAMESPACE

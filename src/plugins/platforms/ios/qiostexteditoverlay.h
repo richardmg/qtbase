@@ -38,8 +38,7 @@
 
 QT_BEGIN_NAMESPACE
 
-Q_FORWARD_DECLARE_OBJC_CLASS(TransparentUITextView);
-Q_FORWARD_DECLARE_OBJC_CLASS(TextViewTouchListener);
+Q_FORWARD_DECLARE_OBJC_CLASS(QIOSLoupeRecognizer);
 
 class QIOSTextEditOverlay
 {
@@ -47,10 +46,7 @@ public:
     static void update(const Qt::InputMethodQueries &updatedProperties);
 
 private:
-    static TransparentUITextView *s_textView;
-    static TextViewTouchListener *s_gestureRecognizer;
-    static void createOverlay();
-    static void deleteOverlay();
+    static QIOSLoupeRecognizer *s_loupeRecognizer;
 };
 
 QT_END_NAMESPACE
