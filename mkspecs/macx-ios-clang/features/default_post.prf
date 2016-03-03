@@ -49,6 +49,14 @@ macx-xcode {
     qmake_launch_images.files = $$qmake_copy_image.output
     QMAKE_BUNDLE_DATA += qmake_launch_images
 
+    qmake_loupe1_image = loupe1@2x.png
+    qmake_copy_loupe1_image.input = $$QMAKESPEC/$$qmake_loupe1_image
+    qmake_copy_loupe1_image.output = $$OUT_PWD/$${TARGET}.xcodeproj/$$qmake_loupe1_image
+    qmake_copy_loupe1_image.CONFIG = verbatim
+    QMAKE_SUBSTITUTES += qmake_copy_loupe1_image
+    qmake_loupe1_images.files = $$qmake_copy_loupe1_image.output
+    QMAKE_BUNDLE_DATA += qmake_loupe1_images
+
     lessThan(QMAKE_XCODE_VERSION, "6.0") {
         warning("You need to update Xcode to version 6 or newer to fully support iPhone6/6+")
     } else {

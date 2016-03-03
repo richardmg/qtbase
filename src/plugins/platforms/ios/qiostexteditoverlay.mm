@@ -44,6 +44,8 @@
 @interface QIOSLoupe : UIView {
     UIView *_targetView;
     UIView *_snapshotView;
+    UIView *_loupeImageView;
+    UIView *_maskView;
 }
 @property (nonatomic, assign) CGPoint focalPoint;
 @end
@@ -52,14 +54,18 @@
 
 - (id)initWithTargetView:(UIView *)targetView
 {
-    if (self = [self initWithFrame:CGRectMake(0, 0, 128, 128)]) {
+    UIImage *loupeImage = [UIImage imageWithContentsOfFile:@"loupe1.png"];
+    if (self = [self initWithFrame:CGRectMake(0, 0, loupeImage.size.width, loupeImage.size.height)]) {
         _targetView = [targetView retain];
         _snapshotView = nil;
 
-        self.layer.borderColor = [[UIColor lightGrayColor] CGColor];
-        self.layer.borderWidth = 1;
-        self.layer.cornerRadius = self.frame.size.width / 2;
-        self.layer.masksToBounds = YES;
+        _maskView = [[UIView alloc] initWithFrame:CGRectOffset(CGRectInset(self.bounds, 3.0, 3.0), 0, -2.0)];
+        _maskView.layer.cornerRadius = _maskView.frame.size.width / 2;
+        _maskView.layer.masksToBounds = YES;
+        [self addSubview:_maskView];
+
+        _loupeImageView = [[UIImageView alloc] initWithImage:loupeImage];
+        [self addSubview:_loupeImageView];
     }
 
     return self;
@@ -76,26 +82,16 @@
     _focalPoint = point;
     const CGFloat yOffset = 10 + (self.frame.size.height / 2);
     [super setCenter:CGPointMake(_focalPoint.x, _focalPoint.y - yOffset)];
-    [self setNeedsDisplay];
-}
-
-- (void)drawRect:(CGRect)rect
-{
-    Q_UNUSED(rect)
-
-    if (!QGuiApplication::focusWindow())
-        return;
-
-    UIView *newSnapshotView = [_targetView snapshotViewAfterScreenUpdates:NO];
 
     const CGFloat loupeScale = 1.5;
     CGFloat x = -(_focalPoint.x * loupeScale) + self.frame.size.width / 2;
     CGFloat y = -(_focalPoint.y * loupeScale) + self.frame.size.height / 2;
-    CGFloat w = newSnapshotView.frame.size.width * loupeScale;
-    CGFloat h = newSnapshotView.frame.size.height * loupeScale;
+    CGFloat w = _targetView.frame.size.width * loupeScale;
+    CGFloat h = _targetView.frame.size.height * loupeScale;
 
+    UIView *newSnapshotView = [_targetView snapshotViewAfterScreenUpdates:NO];
     newSnapshotView.frame = CGRectMake(x, y, w, h);
-    [self addSubview:newSnapshotView];
+    [_maskView addSubview:newSnapshotView];
     [_snapshotView removeFromSuperview];
     _snapshotView = newSnapshotView;
 }
@@ -107,7 +103,6 @@
 @interface QIOSLoupeRecognizer : UIGestureRecognizer <UIGestureRecognizerDelegate> {
     UIView *_targetView;
     QIOSLoupe *_loupeView;
-    CGRect _editRect;
     CGPoint _lastTouchPoint;
     QTimer _triggerLoupeTimer;
 }
@@ -175,9 +170,6 @@
         [focusView addGestureRecognizer:self];
         _targetView = focusView;
     }
-
-    if (updatedProperties & Qt::ImEditRectangle)
-        _editRect = toCGRect(QGuiApplication::inputMethod()->editRectangle());
 }
 
 - (void)createLoupeView
@@ -202,8 +194,8 @@
         _triggerLoupeTimer.stop();
         self.state = UIGestureRecognizerStateFailed;
     } else {
-        // if inside edit rect, then:
-        _triggerLoupeTimer.start();
+        if (QGuiApplication::inputMethod()->editRectangle().contains(fromCGPoint(_lastTouchPoint)))
+            _triggerLoupeTimer.start();
     }
 }
 
