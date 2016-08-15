@@ -158,6 +158,14 @@ void QTabBar::initStyleOption(QStyleOptionTab *option, int tabIndex) const
     option->initFrom(this);
     option->state &= ~(QStyle::State_HasFocus | QStyle::State_MouseOver);
     option->rect = tabRect(tabIndex);
+
+    if (option->version == QStyleOptionTabV4::Version) {
+        QPoint firstTabPos = d->tabList.constFirst().rect.topLeft();
+        QPoint lastTabPos = d->tabList.constLast().rect.bottomRight();
+        QRect tabBarEffectiveRect = QRect(firstTabPos, lastTabPos).translated(-d->scrollOffset, 0);
+        static_cast<QStyleOptionTabV4 *>(option)->scrollRect = tabBarEffectiveRect;
+    }
+
     bool isCurrent = tabIndex == d->currentIndex;
     option->row = 0;
     if (tabIndex == d->pressedIndex)
@@ -581,7 +589,7 @@ QRect QTabBarPrivate::normalizedScrollRect(int index)
     // tab bar itself is in a different orientation.
 
     Q_Q(QTabBar);
-    QStyleOptionTab opt;
+    QStyleOptionTabV4 opt;
     q->initStyleOption(&opt, currentIndex);
     opt.rect = q->rect();
 
@@ -1668,8 +1676,8 @@ void QTabBar::paintEvent(QPaintEvent *)
     int cutLeft = -1;
     int cutRight = -1;
     bool vertical = verticalTabs(d->shape);
-    QStyleOptionTab cutTabLeft;
-    QStyleOptionTab cutTabRight;
+    QStyleOptionTabV4 cutTabLeft;
+    QStyleOptionTabV4 cutTabRight;
     selected = d->currentIndex;
     if (d->dragInProgress)
         selected = d->pressedIndex;
@@ -1684,7 +1692,7 @@ void QTabBar::paintEvent(QPaintEvent *)
         p.drawPrimitive(QStyle::PE_FrameTabBarBase, optTabBase);
 
     for (int i = 0; i < d->tabList.count(); ++i) {
-        QStyleOptionTab tab;
+        QStyleOptionTabV4 tab;
         initStyleOption(&tab, i);
         if (d->paintWithOffsets && d->tabList[i].dragOffset != 0) {
             if (vertical) {

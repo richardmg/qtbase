@@ -280,6 +280,17 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionTab::CornerWidgets)
 
+class Q_WIDGETS_EXPORT QStyleOptionTabV4 : public QStyleOptionTab
+{
+public:
+    enum StyleOptionVersion { Version = 4 };
+
+    QRect scrollRect;
+
+    QStyleOptionTabV4();
+    QStyleOptionTabV4(const QStyleOptionTabV4 &other) : QStyleOptionTab(Version) { *this = other; }
+};
+
 typedef Q_DECL_DEPRECATED QStyleOptionTab QStyleOptionTabV2;
 typedef Q_DECL_DEPRECATED QStyleOptionTab QStyleOptionTabV3;
 #endif // QT_NO_TABBAR

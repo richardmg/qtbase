@@ -1305,6 +1305,15 @@ QStyleOptionTab::QStyleOptionTab(int version)
 }
 
 /*!
+    Constructs a QStyleOptionTab4 object, initializing the members
+    variables to their default values.
+*/
+QStyleOptionTabV4::QStyleOptionTabV4()
+    : QStyleOptionTab(Version)
+{
+}
+
+/*!
     \fn QStyleOptionTab::QStyleOptionTab(const QStyleOptionTab &other)
 
     Constructs a copy of the \a other style option.
