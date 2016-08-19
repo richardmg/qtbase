@@ -160,10 +160,9 @@ void QTabBar::initStyleOption(QStyleOptionTab *option, int tabIndex) const
     option->rect = tabRect(tabIndex);
 
     if (option->version == QStyleOptionTabV4::Version) {
-        QPoint firstTabPos = d->tabList.constFirst().rect.topLeft();
-        QPoint lastTabPos = d->tabList.constLast().rect.bottomRight();
-        QRect tabBarEffectiveRect = QRect(firstTabPos, lastTabPos).translated(-d->scrollOffset, 0);
-        static_cast<QStyleOptionTabV4 *>(option)->scrollRect = tabBarEffectiveRect;
+        QRect firstTab = tabRect(0);
+        QRect lastTab = tabRect(d->tabList.size() - 1);
+        static_cast<QStyleOptionTabV4 *>(option)->unionRect = firstTab.united(lastTab);
     }
 
     bool isCurrent = tabIndex == d->currentIndex;

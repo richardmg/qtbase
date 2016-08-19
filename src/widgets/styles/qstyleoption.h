@@ -285,7 +285,7 @@ class Q_WIDGETS_EXPORT QStyleOptionTabV4 : public QStyleOptionTab
 public:
     enum StyleOptionVersion { Version = 4 };
 
-    QRect scrollRect;
+    QRect unionRect;
 
     QStyleOptionTabV4();
     QStyleOptionTabV4(const QStyleOptionTabV4 &other) : QStyleOptionTab(Version) { *this = other; }
