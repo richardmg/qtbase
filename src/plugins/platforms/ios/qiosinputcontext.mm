@@ -620,8 +620,9 @@ void QIOSInputContext::update(Qt::InputMethodQueries updatedProperties)
 
     // Perform update first, so we can trust the value of inputMethodAccepted()
     Qt::InputMethodQueries changedProperties = m_imeState.update(updatedProperties);
+    bool hasCustomInputView = m_imeState.currentState.value(Qt::ImPlatformData).toMap().value(kImePlatformDataInputView).isValid();
 
-    if (inputMethodAccepted()) {
+    if (inputMethodAccepted() || hasCustomInputView) {
         if (!m_textResponder || [m_textResponder needsKeyboardReconfigure:changedProperties]) {
             qImDebug() << "creating new text responder";
             [m_textResponder autorelease];

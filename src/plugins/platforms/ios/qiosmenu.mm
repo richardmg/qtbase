@@ -515,7 +515,7 @@ void QIOSMenu::toggleShowUsingUIPickerView(bool show)
         Q_ASSERT(!focusObjectWithPickerView);
         focusObjectWithPickerView = qApp->focusWindow()->focusObject();
         focusObjectWithPickerView->installEventFilter(this);
-        qApp->inputMethod()->update(Qt::ImEnabled | Qt::ImPlatformData);
+        qApp->inputMethod()->update(Qt::ImPlatformData);
     } else {
         Q_ASSERT(focusObjectWithPickerView);
         focusObjectWithPickerView->removeEventFilter(this);
@@ -526,7 +526,7 @@ void QIOSMenu::toggleShowUsingUIPickerView(bool show)
         [m_pickerView release];
         m_pickerView = 0;
 
-        qApp->inputMethod()->update(Qt::ImEnabled | Qt::ImPlatformData);
+        qApp->inputMethod()->update(Qt::ImPlatformData);
     }
 }
 
@@ -542,7 +542,6 @@ bool QIOSMenu::eventFilter(QObject *obj, QEvent *event)
             imPlatformData.insert(kImePlatformDataInputView, QVariant::fromValue(static_cast<void *>(m_pickerView)));
             imPlatformData.insert(kImePlatformDataInputAccessoryView, QVariant::fromValue(static_cast<void *>(m_pickerView.toolbar)));
             queryEvent->setValue(Qt::ImPlatformData, imPlatformData);
-            queryEvent->setValue(Qt::ImEnabled, true);
 
             return true;
         }

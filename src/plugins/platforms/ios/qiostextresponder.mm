@@ -249,8 +249,6 @@
 - (BOOL)needsKeyboardReconfigure:(Qt::InputMethodQueries)updatedProperties
 {
     if ((updatedProperties & Qt::ImEnabled)) {
-        Q_ASSERT([self currentImeState:Qt::ImEnabled].toBool());
-
         // When switching on input-methods we need to consider hints and platform data
         // as well, as the IM state that we were based on may have been invalidated when
         // IM was switched off.
