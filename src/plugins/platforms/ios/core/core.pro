@@ -24,7 +24,6 @@ OBJECTIVE_SOURCES = \
     qiosplatformaccessibility.mm \
     qiostextresponder.mm \
     qiosmenu.mm \
-    qiosfileengineassetslibrary.mm \
     qiosfiledialog.mm
 
 HEADERS = \
@@ -47,9 +46,8 @@ HEADERS = \
     qiosplatformaccessibility.h \
     qiostextresponder.h \
     qiosmenu.h \
-    qiosfileenginefactory.h \
-    qiosfileengineassetslibrary.h \
-    qiosfiledialog.h
+    qiosfiledialog.h \
+    qiosrestrictedapiplugininterface.h
 
 OTHER_FILES = \
     quiview_textinput.mm \

@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
+** Copyright (C) 2016 The Qt Company Ltd.
 ** Contact: http://www.qt.io/licensing/
 **
 ** This file is part of the plugins of the Qt Toolkit.
@@ -31,25 +31,12 @@
 **
 ****************************************************************************/
 
-#ifndef QIOSFILEENGINEFACTORY_H
-#define QIOSFILEENGINEFACTORY_H
+#import <UIKit/UIKit.h>
 
-#include <QtCore/qstandardpaths.h>
-#include <QtCore/private/qabstractfileengine_p.h>
-#include "qiosfileengineassetslibrary.h"
+#include "../../core/qiosfiledialog.h"
 
-class QIOSFileEngineFactory : public QAbstractFileEngineHandler
-{
-public:
-    QAbstractFileEngine* create(const QString &fileName) const
-    {
-        static QLatin1String assetsScheme("assets-library:");
-
-        if (fileName.toLower().startsWith(assetsScheme))
-            return new QIOSFileEngineAssetsLibrary(fileName);
-
-        return 0;
-    }
-};
-
-#endif // QIOSFILEENGINEFACTORY_H
+@interface QIOSImagePickerController : UIImagePickerController <UIImagePickerControllerDelegate, UINavigationControllerDelegate> {
+    QIOSFileDialog *m_fileDialog;
+}
+- (id)initWithQIOSFileDialog:(QIOSFileDialog *)fileDialog;
+@end

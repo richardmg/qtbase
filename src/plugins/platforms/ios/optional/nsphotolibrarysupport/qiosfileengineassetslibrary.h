@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
+** Copyright (C) 2016 The Qt Company Ltd.
 ** Contact: http://www.qt.io/licensing/
 **
 ** This file is part of the plugins of the Qt Toolkit.
@@ -31,46 +31,51 @@
 **
 ****************************************************************************/
 
-#ifndef QIOSFILEDIALOG_H
-#define QIOSFILEDIALOG_H
+#ifndef QIOSFILEENGINEASSETSLIBRARY_H
+#define QIOSFILEENGINEASSETSLIBRARY_H
 
-#include <QtCore/qeventloop.h>
-#include <qpa/qplatformdialoghelper.h>
+#include <QtCore/private/qabstractfileengine_p.h>
+
+Q_FORWARD_DECLARE_OBJC_CLASS(ALAsset);
 
 QT_BEGIN_NAMESPACE
 
-Q_FORWARD_DECLARE_OBJC_CLASS(UIViewController);
+class QIOSAssetData;
 
-class QIOSFileDialog : public QPlatformFileDialogHelper
+class QIOSFileEngineAssetsLibrary : public QAbstractFileEngine
 {
 public:
-    QIOSFileDialog();
-    ~QIOSFileDialog();
+    QIOSFileEngineAssetsLibrary(const QString &fileName);
+    ~QIOSFileEngineAssetsLibrary();
 
-    void exec() Q_DECL_OVERRIDE;
-    bool defaultNameFilterDisables() const Q_DECL_OVERRIDE { return false; }
-    bool show(Qt::WindowFlags windowFlags, Qt::WindowModality windowModality, QWindow *parent) Q_DECL_OVERRIDE;
-    void hide() Q_DECL_OVERRIDE;
-    void setDirectory(const QUrl &) Q_DECL_OVERRIDE {}
-    QUrl directory() const Q_DECL_OVERRIDE { return QUrl(); }
-    void selectFile(const QUrl &) Q_DECL_OVERRIDE {}
-    QList<QUrl> selectedFiles() const Q_DECL_OVERRIDE;
-    void setFilter() Q_DECL_OVERRIDE {}
-    void selectNameFilter(const QString &) Q_DECL_OVERRIDE {}
-    QString selectedNameFilter() const Q_DECL_OVERRIDE { return QString(); }
+    bool open(QIODevice::OpenMode openMode) override;
+    bool close() override;
+    FileFlags fileFlags(FileFlags type) const override;
+    qint64 size() const override;
+    qint64 read(char *data, qint64 maxlen) override;
+    qint64 pos() const override;
+    bool seek(qint64 pos) override;
+    QString fileName(FileName file) const override;
+    void setFileName(const QString &file) override;
+    QStringList entryList(QDir::Filters filters, const QStringList &filterNames) const override;
 
-    void selectedFilesChanged(QList<QUrl> selection);
+#ifndef QT_NO_FILESYSTEMITERATOR
+    Iterator *beginEntryList(QDir::Filters filters, const QStringList &filterNames) override;
+    Iterator *endEntryList() override;
+#endif
+
+    void setError(QFile::FileError error, const QString &str) { QAbstractFileEngine::setError(error, str); }
 
 private:
-    QUrl m_directory;
-    QList<QUrl> m_selection;
-    QEventLoop m_eventLoop;
-    UIViewController *m_viewController;
+    QString m_fileName;
+    QString m_assetUrl;
+    qint64 m_offset;
+    mutable QIOSAssetData *m_data;
 
-    bool showImagePickerDialog(QWindow *parent);
+    ALAsset *loadAsset() const;
 };
 
 QT_END_NAMESPACE
 
-#endif // QIOSFILEDIALOG_H
+#endif // QIOSFILEENGINEASSETSLIBRARY_H
 

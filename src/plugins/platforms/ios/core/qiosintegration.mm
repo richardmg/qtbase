@@ -43,6 +43,7 @@
 #include "qiosinputcontext.h"
 #include "qiostheme.h"
 #include "qiosservices.h"
+#include "qiosrestrictedapiplugininterface.h"
 
 #include <QtGui/private/qguiapplication_p.h>
 
@@ -68,6 +69,7 @@ QIOSIntegration::QIOSIntegration()
     , m_inputContext(0)
     , m_platformServices(new QIOSServices)
     , m_accessibility(0)
+    , m_restrictedApiPlugins(new QFactoryLoader(QIosOptionalPluginInterface_iid, QLatin1String("/platforms")))
     , m_debugWindowManagement(false)
 {
     if (![UIApplication sharedApplication]) {
@@ -112,6 +114,9 @@ QIOSIntegration::QIOSIntegration()
     m_touchDevice->setCapabilities(touchCapabilities);
     QWindowSystemInterface::registerTouchDevice(m_touchDevice);
     QMacInternalPasteboardMime::initializeMimeTypes();
+
+    for (int i = 0; i < m_restrictedApiPlugins->metaData().size(); ++i)
+        qobject_cast<QIosOptionalPluginInterface *>(m_restrictedApiPlugins->instance(i))->initPlugin();
 }
 
 QIOSIntegration::~QIOSIntegration()
@@ -134,6 +139,9 @@ QIOSIntegration::~QIOSIntegration()
 
     delete m_accessibility;
     m_accessibility = 0;
+
+    delete m_restrictedApiPlugins;
+    m_restrictedApiPlugins = 0;
 }
 
 bool QIOSIntegration::hasCapability(Capability cap) const
