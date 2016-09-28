@@ -40,7 +40,7 @@ QT_BEGIN_NAMESPACE
 class QIOSIntegrationPlugin : public QPlatformIntegrationPlugin
 {
     Q_OBJECT
-        Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "ios.json")
+        Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "kernel.json")
     public:
         QPlatformIntegration *create(const QString&, const QStringList&);
 };
