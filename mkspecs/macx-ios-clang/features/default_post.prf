@@ -80,3 +80,15 @@ macx-xcode {
     QMAKE_CXXFLAGS         += $$arch_flags
     QMAKE_LFLAGS           += $$arch_flags
 }
+
+macx-xcode:!isEmpty(QMAKE_INFO_PLIST) {
+    # Only link in photo library support if Info.plist contains
+    # NSPhotoLibraryUsageDescription. Otherwise it will be rejected from AppStore.
+    system([[ $$QMAKE_INFO_PLIST = /* ]]) \
+        plist_path = $$QMAKE_INFO_PLIST
+    else: \
+        plist_path = $$_PRO_FILE_PWD_/$$QMAKE_INFO_PLIST
+
+    system("&>/dev/null /usr/libexec/PlistBuddy -c 'Print NSPhotoLibraryUsageDescription' $$plist_path"): \
+        QTPLUGIN += qiosnsphotolibrarysupport
+}
