@@ -1755,6 +1755,8 @@ QVariant QLineEdit::inputMethodQuery(Qt::InputMethodQuery property, QVariant arg
     Q_D(const QLineEdit);
     switch(property) {
     case Qt::ImCursorRectangle:
+        if (argument.canConvert<int>())
+            return d->adjustedControlRect(d->control->rectForPos(argument.toInt()));
         return d->cursorRect();
     case Qt::ImAnchorRectangle:
         return d->adjustedControlRect(d->control->anchorRect());

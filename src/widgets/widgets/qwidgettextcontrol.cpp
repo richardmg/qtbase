@@ -2080,6 +2080,8 @@ QVariant QWidgetTextControl::inputMethodQuery(Qt::InputMethodQuery property, QVa
     QTextBlock block = d->cursor.block();
     switch(property) {
     case Qt::ImCursorRectangle:
+        if (argument.canConvert<int>())
+            return d->rectForPosition(argument.toInt());
         return cursorRect();
     case Qt::ImAnchorRectangle:
         return d->rectForPosition(d->cursor.anchor());
