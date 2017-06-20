@@ -92,6 +92,11 @@ static void executeBlockWithoutAnimation(Block block)
 @property (nonatomic, assign) BOOL visible;
 @property (nonatomic, readonly) BOOL isHiding;
 @property (nonatomic, assign) BOOL reshowAfterHidden;
+
+// self.owner is just a helper property that the different gesture recognisers
+// can set after e.g calling self.visible = YES if they need to track who showed
+// the menu, and hence, should also take the responsibility of hiding it.
+@property (nonatomic, assign) id owner;
 @end
 
 @implementation QIOSEditMenu
@@ -522,6 +527,7 @@ static void executeBlockWithoutAnimation(Block block)
         // Restore cursor blinking, and hide the loupe
         QGuiApplication::styleHints()->setCursorFlashTime(_originalCursorFlashTime);
         QIOSTextInputOverlay::s_editMenu.visible = YES;
+        QIOSTextInputOverlay::s_editMenu.owner = self;
         _loupeLayer.visible = NO;
         break;
     default:
@@ -857,7 +863,8 @@ static void executeBlockWithoutAnimation(Block block)
     if (!hasSelection()) {
         _cursorLayer.visible = NO;
         _anchorLayer.visible = NO;
-        QIOSTextInputOverlay::s_editMenu.visible = NO;
+        if (QIOSTextInputOverlay::s_editMenu.owner == self)
+            QIOSTextInputOverlay::s_editMenu.visible = NO;
         return;
     }
 
@@ -867,6 +874,7 @@ static void executeBlockWithoutAnimation(Block block)
         // case, we reshow the menu after it has closed (but then with selection based
         // menu items, as specified by first responder).
         QIOSTextInputOverlay::s_editMenu.reshowAfterHidden = YES;
+        QIOSTextInputOverlay::s_editMenu.owner = self;
     }
 
     // Adjust handles and input rect to match the new selection
