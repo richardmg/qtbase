@@ -75,6 +75,29 @@ static bool hasSelection()
     return selection.first != selection.second;
 }
 
+static void setSelection(int pos, int length)
+{
+    QList<QInputMethodEvent::Attribute> imAttributes;
+    imAttributes.append(QInputMethodEvent::Attribute(QInputMethodEvent::Selection, pos, length, QVariant()));
+    QInputMethodEvent event(QString(), imAttributes);
+    QGuiApplication::sendEvent(qApp->focusObject(), &event);
+}
+
+static void hideImCursor()
+{
+    QList<QInputMethodEvent::Attribute> imAttributes;
+    imAttributes.append(QInputMethodEvent::Attribute(QInputMethodEvent::Cursor, 0, 0, QVariant()));
+    QInputMethodEvent event(QString(), imAttributes);
+    QGuiApplication::sendEvent(qApp->focusObject(), &event);
+}
+
+int textPosForTouchPoint(const QPointF &touchPoint, bool absolutePosition)
+{
+    Qt::InputMethodQuery query = absolutePosition ? Qt::ImAbsolutePosition : Qt::ImCursorPosition;
+    const QTransform mapToLocal = QGuiApplication::inputMethod()->inputItemTransform().inverted();
+    return QInputMethod::queryFocusObject(query, touchPoint * mapToLocal).toInt();
+}
+
 static void executeBlockWithoutAnimation(Block block)
 {
     [CATransaction begin];
@@ -470,7 +493,6 @@ static void executeBlockWithoutAnimation(Block block)
     CGPoint _firstTouchPoint;
     CGPoint _lastTouchPoint;
     QTimer _triggerStateBeganTimer;
-    int _originalCursorFlashTime;
 }
 @property (nonatomic, assign) QPointF focalPoint;
 @property (nonatomic, assign) BOOL dragTriggersGesture;
@@ -523,22 +545,19 @@ static void executeBlockWithoutAnimation(Block block)
 - (void)gestureStateChanged
 {
     switch (self.state) {
-    case UIGestureRecognizerStateBegan:
-        // Stop cursor blinking, and show the loupe
-        _originalCursorFlashTime = QGuiApplication::styleHints()->cursorFlashTime();
-        QGuiApplication::styleHints()->setCursorFlashTime(0);
+    case UIGestureRecognizerStateBegan: {
+        // Show loupe
         if (!_loupeLayer)
             [self createLoupe];
         [self updateFocalPoint:QPointF::fromCGPoint(_lastTouchPoint)];
         _loupeLayer.visible = YES;
-        break;
+        break; }
     case UIGestureRecognizerStateChanged:
         // Tell the sub class to move the loupe to the correct position
         [self updateFocalPoint:QPointF::fromCGPoint(_lastTouchPoint)];
         break;
     case UIGestureRecognizerStateEnded:
         // Restore cursor blinking, and hide the loupe
-        QGuiApplication::styleHints()->setCursorFlashTime(_originalCursorFlashTime);
         QIOSTextInputOverlay::s_editMenu.visible = YES;
         QIOSTextInputOverlay::s_editMenu.owner = self;
         _loupeLayer.visible = NO;
@@ -654,10 +673,38 @@ static void executeBlockWithoutAnimation(Block block)
   the user does a press and hold, which will start a session where the user can move
   the cursor around with his finger together with a magnifier glass.
   */
-@interface QIOSCursorRecognizer : QIOSLoupeRecognizer
+@interface QIOSCursorRecognizer : QIOSLoupeRecognizer {
+    CALayer *_clipRectLayer;
+    QIOSHandleLayer *_cursorLayer;
+    QPointF _touchOffset;
+}
 @end
 
 @implementation QIOSCursorRecognizer
+
+- (void)setEnabled:(BOOL)enabled
+{
+    if (enabled == self.enabled)
+        return;
+
+    [super setEnabled:enabled];
+
+    if (enabled) {
+        // Create a layer that clips the handle inside the input field
+        _clipRectLayer = [CALayer new];
+        _clipRectLayer.masksToBounds = YES;
+        [self.focusView.layer addSublayer:_clipRectLayer];
+
+        // Create the handle layer, and add it to the clipped input rect layer
+        _cursorLayer = [[QIOSHandleLayer new] autorelease];
+        [_clipRectLayer addSublayer:_cursorLayer];
+    } else {
+        [_clipRectLayer removeFromSuperlayer];
+        [_clipRectLayer release];
+        _clipRectLayer = 0;
+        _cursorLayer = 0;
+    }
+}
 
 - (QIOSLoupeLayer *)createLoupeLayer
 {
@@ -672,8 +719,37 @@ static void executeBlockWithoutAnimation(Block block)
 
 - (void)updateFocalPoint:(QPointF)touchPoint
 {
-    platformInputContext()->setSelectionOnFocusObject(touchPoint, touchPoint);
+    QRectF inputRect = QGuiApplication::inputMethod()->inputItemClipRectangle();
+    executeBlockWithoutAnimation(^{ _clipRectLayer.frame = inputRect.toCGRect(); });
+
+    int textPos = textPosForTouchPoint(touchPoint, true);
+    QRectF rect = QInputMethod::queryFocusObject(Qt::ImCursorRectangle, textPos).toRectF();
+    _cursorLayer.cursorRectangle = rect.toCGRect();
+
     self.focalPoint = touchPoint;
+}
+
+- (void)gestureStateChanged
+{
+    switch (self.state) {
+    case UIGestureRecognizerStateBegan:
+        hideImCursor();
+        _cursorLayer.visible = YES;
+        break;
+    case UIGestureRecognizerStateChanged:
+        break;
+    case UIGestureRecognizerStateEnded:
+    default:
+        // Move the cursor in the focus object to the new position.
+        // This will result in a cursorRectangleChanged signal, which
+        // will trigger an edit menu to be shown from QIOSSelectionRecognizer.
+        int textPos = textPosForTouchPoint(self.focalPoint, false);
+        setSelection(textPos, 0);
+        _cursorLayer.visible = NO;
+        break;
+    }
+
+    [super gestureStateChanged];
 }
 
 @end
@@ -845,24 +921,15 @@ static void executeBlockWithoutAnimation(Block block)
 - (void)updateFocalPoint:(QPointF)touchPoint
 {
     touchPoint += _touchOffset;
-
-    // Get the text position under the touch
-    SelectionPair selection = querySelection();
-    const QTransform mapToLocal = QGuiApplication::inputMethod()->inputItemTransform().inverted();
-    int touchTextPos = QInputMethod::queryFocusObject(Qt::ImCursorPosition, touchPoint * mapToLocal).toInt();
+    int touchTextPos = textPosForTouchPoint(touchPoint, false);
 
     // Ensure that the handels cannot be dragged past each other
+    SelectionPair selection = querySelection();
     if (_dragOnCursor)
         selection.second = (touchTextPos > selection.first) ? touchTextPos : selection.first + 1;
     else
         selection.first = (touchTextPos < selection.second) ? touchTextPos : selection.second - 1;
-
-    // Set new selection
-    QList<QInputMethodEvent::Attribute> imAttributes;
-    imAttributes.append(QInputMethodEvent::Attribute(
-        QInputMethodEvent::Selection, selection.first, selection.second - selection.first, QVariant()));
-    QInputMethodEvent event(QString(), imAttributes);
-    QGuiApplication::sendEvent(qApp->focusObject(), &event);
+    setSelection(selection.first, selection.second - selection.first);
 
     // Move loupe to new position
     QRectF handleRect = _dragOnCursor ?
