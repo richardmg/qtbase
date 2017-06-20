@@ -323,6 +323,7 @@ static void executeBlockWithoutAnimation(Block block)
     CALayer *_handleCursorLayer;
     CALayer *_handleKnobLayer;
     Qt::Edge _selectionEdge;
+    BOOL _animateCursor;
 }
 @property (nonatomic, assign) CGRect cursorRectangle;
 @property (nonatomic, assign) CGFloat handleScale;
@@ -334,21 +335,31 @@ static void executeBlockWithoutAnimation(Block block)
 
 @dynamic handleScale;
 
-- (id)initWithKnobAtEdge:(Qt::Edge)selectionEdge
+- (id)init
 {
     if (self = [super init]) {
-        CGColorRef bgColor = [UIColor colorWithRed:0.1 green:0.4 blue:0.9 alpha:1].CGColor;
-        _selectionEdge = selectionEdge;
+        _selectionEdge = Qt::Edge(0);
+        _animateCursor = NO;
         self.handleScale = 0;
+        _handleKnobLayer = nil;
 
         _handleCursorLayer = [[CALayer new] autorelease];
         _handleCursorLayer.masksToBounds = YES;
-        _handleCursorLayer.backgroundColor = bgColor;
+        _handleCursorLayer.backgroundColor = [UIColor colorWithRed:0.1 green:0.4 blue:0.9 alpha:1].CGColor;
         [self addSublayer:_handleCursorLayer];
+    }
+    return self;
+}
+
+- (id)initWithKnobAtEdge:(Qt::Edge)selectionEdge
+{
+    if (self = [self init]) {
+        _selectionEdge = selectionEdge;
+        _animateCursor = YES;
 
         _handleKnobLayer = [[CALayer new] autorelease];
         _handleKnobLayer.masksToBounds = YES;
-        _handleKnobLayer.backgroundColor = bgColor;
+        _handleKnobLayer.backgroundColor = _handleCursorLayer.backgroundColor;
         _handleKnobLayer.cornerRadius = kKnobWidth / 2;
         [self addSublayer:_handleKnobLayer];
     }
@@ -427,18 +438,20 @@ static void executeBlockWithoutAnimation(Block block)
     CGFloat cursorWidth = 2;
     CGPoint origin = _cursorRectangle.origin;
     CGSize size = _cursorRectangle.size;
-    CGFloat scale = ((QIOSHandleLayer *)[self presentationLayer]).handleScale;
+    CGFloat scale = _animateCursor ? ((QIOSHandleLayer *)[self presentationLayer]).handleScale : self.handleScale;
     CGFloat edgeAdjustment = (_selectionEdge == Qt::LeftEdge) ? 0.5 - cursorWidth : -0.5;
 
     CGFloat cursorX = origin.x + (size.width / 2) + edgeAdjustment;
     CGFloat cursorY = origin.y;
-    CGFloat knobX = cursorX - (kKnobWidth - cursorWidth) / 2;
-    CGFloat knobY = origin.y + ((_selectionEdge == Qt::LeftEdge) ? -kKnobWidth : size.height);
-
     _handleCursorLayer.frame = CGRectMake(cursorX, cursorY, cursorWidth, size.height);
-    _handleKnobLayer.frame = CGRectMake(knobX, knobY, kKnobWidth, kKnobWidth);
     _handleCursorLayer.transform = CATransform3DMakeScale(1, scale, scale);
-    _handleKnobLayer.transform = CATransform3DMakeScale(scale, scale, scale);
+
+    if (_handleKnobLayer) {
+        CGFloat knobX = cursorX - (kKnobWidth - cursorWidth) / 2;
+        CGFloat knobY = origin.y + ((_selectionEdge == Qt::LeftEdge) ? -kKnobWidth : size.height);
+        _handleKnobLayer.frame = CGRectMake(knobX, knobY, kKnobWidth, kKnobWidth);
+        _handleKnobLayer.transform = CATransform3DMakeScale(scale, scale, scale);
+    }
 }
 
 @end
