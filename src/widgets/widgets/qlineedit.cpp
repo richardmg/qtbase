@@ -1780,6 +1780,11 @@ QVariant QLineEdit::inputMethodQuery(Qt::InputMethodQuery property, QVariant arg
             return QVariant(d->control->selectionEnd());
         else
             return QVariant(d->control->selectionStart());
+    case Qt::ImAbsolutePosition: {
+        const QPointF pt = argument.toPointF();
+        if (!pt.isNull())
+            return QVariant(d->xToPos(pt.x(), QTextLine::CursorBetweenCharacters));
+        return QVariant(d->control->cursor()); }
     default:
         return QWidget::inputMethodQuery(property);
     }
